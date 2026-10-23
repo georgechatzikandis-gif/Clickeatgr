@@ -47,6 +47,10 @@ export function describeDay(hours: HoursRange[], weekday: number): string | null
   const ranges = hours
     .filter((h) => h.weekday === weekday)
     .sort((a, b) => toMinutes(a.opensAt) - toMinutes(b.opensAt))
-    .map((h) => `${h.opensAt.slice(0, 5)}–${h.closesAt.slice(0, 5)}`);
+    .map((h) =>
+      toMinutes(h.opensAt) === 0 && toMinutes(h.closesAt) === 0
+        ? "24ωρο"
+        : `${h.opensAt.slice(0, 5)}–${h.closesAt.slice(0, 5)}`,
+    );
   return ranges.length ? ranges.join(", ") : null;
 }

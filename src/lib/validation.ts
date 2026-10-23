@@ -24,7 +24,7 @@ export const cartLineSchema = z.object({
   optionIds: z.array(z.uuid()).max(30).default([]),
   notes: optionalText(200),
 });
-export type CartLineInput = z.infer<typeof cartLineSchema>;
+
 
 export const placeOrderSchema = z
   .object({

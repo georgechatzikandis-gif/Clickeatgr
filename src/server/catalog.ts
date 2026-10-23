@@ -34,6 +34,8 @@ export type BusinessCard = {
   categorySlugs: string[];
   categoryNames: string[];
   hours: HoursRange[];
+  /** Lower-case product names, used by the home page food search. */
+  productNames: string;
 };
 
 export async function listRegions() {
@@ -54,7 +56,7 @@ export async function listBusinessCards(regionSlug: string, now = new Date()): P
     .orderBy(asc(businesses.name));
   if (!rows.length) return [];
   const ids = rows.map((r) => r.b.id);
-  const [hours, zones, cats] = await Promise.all([
+  const [hours, zones, cats, prods] = await Promise.all([
     db.select().from(businessHours).where(inArray(businessHours.businessId, ids)),
     db
       .select()
@@ -65,6 +67,10 @@ export async function listBusinessCards(regionSlug: string, now = new Date()): P
       .from(businessCategories)
       .innerJoin(categories, eq(categories.id, businessCategories.categoryId))
       .where(inArray(businessCategories.businessId, ids)),
+    db
+      .select({ businessId: products.businessId, name: products.name })
+      .from(products)
+      .where(and(inArray(products.businessId, ids), isNull(products.deletedAt), eq(products.isAvailable, true))),
   ]);
   const cards = rows.map(({ b }) => {
     const h = hours.filter((x) => x.businessId === b.id);
@@ -89,6 +95,10 @@ export async function listBusinessCards(regionSlug: string, now = new Date()): P
       categorySlugs: c.map((x) => x.slug),
       categoryNames: c.map((x) => x.name),
       hours: h,
+      productNames: prods
+        .filter((x) => x.businessId === b.id)
+        .map((x) => x.name.toLowerCase())
+        .join(" | "),
     };
   });
   // Open businesses first.

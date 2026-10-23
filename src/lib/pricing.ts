@@ -1,4 +1,4 @@
-import type { CartLineInput } from "./validation";
+export type CartLineInput = { productId: string; quantity: number; optionIds: string[]; notes?: string };
 
 export type MenuOption = { id: string; name: string; priceDeltaCents: number; isAvailable: boolean };
 export type MenuOptionGroup = {
