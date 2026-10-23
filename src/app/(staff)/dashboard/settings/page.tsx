@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { saveHoursAction, saveProfileAction, saveZoneAction, uploadBusinessImageAction } from "@/app/actions/business";
 import { ActionForm, SubmitButton } from "@/components/action-form";
+import { CopyHoursButton } from "@/components/dashboard/copy-hours";
 import { ImageInput } from "@/components/image-input";
 import { WEEKDAYS_EL } from "@/lib/hours";
 import { centsToInput } from "@/lib/money";
@@ -106,7 +107,8 @@ export default async function SettingsPage() {
               );
             })}
           </div>
-          <div className="mt-3">
+          <div className="mt-3 flex flex-wrap gap-2">
+            <CopyHoursButton />
             <SubmitButton>Αποθήκευση ωραρίου</SubmitButton>
           </div>
         </ActionForm>
