@@ -1,36 +1,65 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ClickEat — online food ordering for Rhodes
 
-## Getting Started
+One central website where customers order from local businesses (guest checkout, cash on delivery or
+payment at pickup), businesses manage orders and menus from any browser, and the platform owner
+manages everything from an admin dashboard. Commission is 0% during the free trial and can be
+switched on later from the admin dashboard, without code changes.
 
-First, run the development server:
+- Architecture, costs and legal checklist: [`docs/PLAN.md`](docs/PLAN.md)
+- Going live step by step: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+
+## Run it on your computer
+
+Requirements: Node.js 22, pnpm (`corepack enable`), PostgreSQL 16+.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+cp .env.example .env.local        # then edit DATABASE_URL and APP_SECRET
+pnpm db:migrate                   # create the tables
+pnpm db:seed:demo                 # DEMO data only — prints demo logins
+pnpm dev                          # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Demo logins (local only, password `demo-password-123`):
+`admin@demo.clickeat.local`, `pizza@demo.clickeat.local`, `souvlaki@demo.clickeat.local`, `cafe@demo.clickeat.local`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+| Page | URL |
+|---|---|
+| Customer site | `/` |
+| Business dashboard | `/dashboard` |
+| Admin dashboard | `/admin` |
+| Staff login | `/login` |
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Tests
 
-## Learn More
+```bash
+createdb clickeat_test             # once; or set TEST_DATABASE_URL
+pnpm test                          # unit + database integration tests
+pnpm test:e2e                      # browser tests (needs the demo data and a running app)
+pnpm lint && pnpm typecheck
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Useful commands
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Command | What it does |
+|---|---|
+| `pnpm db:generate` | Create a migration after changing `src/db/schema.ts` |
+| `pnpm db:migrate` | Apply migrations to the database in `DATABASE_URL` |
+| `pnpm db:seed` | Base data for production (Rhodes region, food categories) |
+| `pnpm user:create admin you@example.com` | Create an admin (asks for the password) |
+| `pnpm user:create business owner@shop.gr <slug>` | Create a business login |
+| `pnpm data:anonymize` | GDPR retention (dry run; add `--apply`) |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Project layout
 
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```
+src/app/(shop)      customer pages: home, /r/[slug], checkout, /order/[id], legal
+src/app/(staff)     /login, /dashboard (business), /admin
+src/app/actions     server actions (the only way data is changed)
+src/server          database access, auth, orders, images (server-only)
+src/lib             pure logic: pricing, commission, hours, validation (unit-tested)
+src/db/schema.ts    database schema
+drizzle/            SQL migrations
+scripts/            seed, user creation, retention
+tests/              unit, integration (real Postgres), e2e (Playwright)
+```

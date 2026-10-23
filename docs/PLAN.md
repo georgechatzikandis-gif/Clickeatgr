@@ -1,6 +1,6 @@
 # ClickEat — Architecture, Costs & Implementation Plan
 
-Status: Stage 1 (planning) complete, Stage 2 (MVP) in progress.
+Status: Stages 1–3 complete (MVP built and tested locally). Stage 4 (deployment) not started — see `docs/DEPLOYMENT.md`.
 Last reviewed: October 2026. All prices must be re-checked on the vendor's own pricing page before you sign up.
 
 ---
@@ -29,7 +29,7 @@ Key decisions and why:
 | Styling | Tailwind CSS 4 | Fast to build mobile-first UI, no paid UI kit. |
 | Database | PostgreSQL via Drizzle ORM (`postgres` driver) | Standard Postgres, so we can move between Supabase, Neon, or a VPS without rewriting code. |
 | Auth | Own session auth for **staff only** (admin + business users), scrypt password hashing, DB-stored sessions, httpOnly cookies | Customers check out as guests, so only a handful of staff accounts exist. No third-party auth service is needed and there is nothing to pay for. |
-| Authorization | Every server action calls `requireAdmin()` or `requireBusinessUser()` and every business query is filtered by the business id **taken from the session**, never from the browser | Real server-side enforcement, covered by automated tests. |
+| Authorization | Every server action calls `requireAdmin()` or `requireBusinessUser()` and every business query is filtered by the business id **taken from the session**, never from the browser. Row-Level Security is enabled on all tables with no policies, so no database role other than the app's owner role can read anything (blocks Supabase's public Data API) | Real server-side enforcement, covered by automated tests. |
 | Real-time orders | Polling every 10 s while the dashboard is open, with sound + tab-title alerts | Free, works on any host, no WebSocket service. Plenty for 2–3 businesses. |
 | Images | Uploaded, resized to WebP (max 1200 px) with `sharp`, stored in Postgres, served with long cache headers | Zero extra services. ~100 KB/image → a few hundred images ≈ 30–50 MB. Can move to Supabase Storage / Cloudflare R2 later behind the same interface. |
 | Maps / addresses | No maps API. Each business defines **named delivery zones** (e.g. "Ρόδος – Πόλη", "Ιξιά", "Φαληράκι") with its own fee and minimum | No per-request costs; matches how local shops already price delivery. |
@@ -114,7 +114,19 @@ I am not a lawyer; please confirm these with a Greek accountant/lawyer.
 ## 6. Stages
 
 1. **Planning** — this document. ✅
-2. **MVP** — storefront, cart, guest checkout (cash), business dashboard, admin dashboard. In progress.
-3. **Testing** — unit tests (prices, commission, opening hours), integration tests against real Postgres (order placement, authorization, duplicates), browser end-to-end test.
+2. **MVP** — storefront, cart, guest checkout (cash), business dashboard, admin dashboard. ✅
+3. **Testing** — unit tests (prices, commission, opening hours), integration tests against real Postgres (order placement, authorization, duplicates), browser end-to-end tests on mobile and desktop viewports. ✅ (locally, against a production build)
 4. **Deployment** — chosen host, domain, env vars, database, backups.
 5. **Expansion** — online payments (Stripe Connect / Viva), automatic commission, refunds, more islands, push notifications, English UI.
+
+## 7. Known limitations of the MVP (deliberately left out)
+
+- **Greek only.** English UI is not implemented yet (texts are in the components; adding a dictionary is a later step).
+- **No email/SMS notifications.** Businesses get sound + visual alerts while `/dashboard` is open; customers follow
+  the status on their order page. Email (Resend free tier) can be added later.
+- **Polling, not push.** The dashboard checks every 10 s. A closed browser tab gets no alerts.
+- **Location selector** shows only Rhodes; more regions can be added from the admin, but the home page is not yet
+  region-switchable.
+- **Admins cannot edit a business's menu directly** (they can edit profile, status, trial/commission, zones and
+  accounts). A business user does the menu, or the admin creates a business login for themselves.
+- **No scheduled/pre-orders, discounts or coupons.** The `discount_cents` field exists for later.

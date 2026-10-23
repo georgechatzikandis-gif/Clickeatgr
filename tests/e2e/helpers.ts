@@ -1,4 +1,8 @@
 import type { Page, TestInfo } from "@playwright/test";
+import { config } from "dotenv";
+import postgres from "postgres";
+
+config({ path: ".env.local", quiet: true });
 
 export const DEMO_PASSWORD = "demo-password-123";
 
@@ -8,7 +12,15 @@ export async function shot(page: Page, info: TestInfo, name: string) {
   if (dir) await page.screenshot({ path: `${dir}/${info.project.name}-${name}.png`, fullPage: true });
 }
 
+/** The tests place many orders from one IP; reset the per-IP order limit so they aren't blocked. */
+export async function resetRateLimits() {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1, onnotice: () => {} });
+  await sql`delete from rate_limits`;
+  await sql.end();
+}
+
 export async function placeDemoPizzaOrder(page: Page, info?: TestInfo) {
+  await resetRateLimits();
   await page.goto("/");
   await page.getByPlaceholder("Αναζήτηση").fill("μαργαρ");
   await page.getByRole("link", { name: /Πιτσαρία/ }).click();

@@ -1,0 +1,27 @@
+name: Monthly data retention
+
+# Anonymises customer details on orders older than 12 months (GDPR data minimisation).
+# Required repository secret: PRODUCTION_DATABASE_URL.
+
+on:
+  schedule:
+    - cron: "41 3 1 * *"
+  workflow_dispatch:
+
+jobs:
+  anonymize:
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+        if: env.DATABASE_URL != ''
+      - uses: pnpm/action-setup@v4
+        if: env.DATABASE_URL != ''
+      - uses: actions/setup-node@v4
+        if: env.DATABASE_URL != ''
+        with:
+          node-version: 22
+          cache: pnpm
+      - if: env.DATABASE_URL != ''
+        run: pnpm install --frozen-lockfile && pnpm data:anonymize --apply

@@ -1,0 +1,40 @@
+name: Nightly database backup
+
+# Dumps the production database every night, encrypts it with BACKUP_PASSPHRASE and keeps it
+# as a workflow artifact for 30 days. Encryption matters: artifacts must never expose customer data.
+# Required repository secrets: PRODUCTION_DATABASE_URL (direct connection, port 5432) and BACKUP_PASSPHRASE.
+
+on:
+  schedule:
+    - cron: "17 2 * * *" # 02:17 UTC ≈ 04:17/05:17 Athens
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    container: postgres:17
+    env:
+      DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+      PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+    steps:
+      - name: Check secrets
+        run: |
+          if [ -z "$DATABASE_URL" ] || [ -z "$PASSPHRASE" ]; then
+            echo "Backup secrets are not configured yet; skipping."; echo "SKIP=1" >> "$GITHUB_ENV"
+          fi
+      - name: Dump and encrypt
+        if: env.SKIP != '1'
+        run: |
+          apt-get update -qq && apt-get install -y -qq gnupg >/dev/null
+          FILE="clickeat-$(date -u +%Y%m%d-%H%M).dump"
+          pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL" > "$FILE"
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$PASSPHRASE" --symmetric --cipher-algo AES256 -o "$FILE.gpg" "$FILE"
+          rm "$FILE"
+          ls -lh "$FILE.gpg"
+          echo "BACKUP_FILE=$FILE.gpg" >> "$GITHUB_ENV"
+      - uses: actions/upload-artifact@v4
+        if: env.SKIP != '1'
+        with:
+          name: ${{ env.BACKUP_FILE }}
+          path: ${{ env.BACKUP_FILE }}
+          retention-days: 30
