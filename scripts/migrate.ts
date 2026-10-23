@@ -11,10 +11,24 @@ const HINTS: Record<string, string> = {
   ETIMEDOUT: "Connection timed out (check host/port; direct db.* hosts are IPv6-only — use the session pooler).",
 };
 
+/** Facts about the password that help find typos without revealing it. */
+function describePassword(raw: string): string {
+  const pw = decodeURIComponent(raw);
+  const symbols = [...new Set(pw.replace(/[A-Za-z0-9]/g, "").split(""))].map((c) => (c === " " ? "space" : c));
+  const notes = [`${pw.length} characters`, symbols.length ? `symbols: ${symbols.join(" ")}` : "letters and digits only"];
+  if (/^\[|\]$/.test(pw)) notes.push("WARNING: starts/ends with a bracket — remove the [ ]");
+  if (/YOUR-PASSWORD/i.test(pw)) notes.push("WARNING: still contains the placeholder YOUR-PASSWORD");
+  if (/\s/.test(pw)) notes.push("WARNING: contains whitespace");
+  return notes.join(", ");
+}
+
 async function main() {
-  const url = new URL(process.env.DATABASE_URL!.replace(/^postgres(ql)?:/, "http:"));
-  // Safe diagnostics: never prints the password.
+  const raw = process.env.DATABASE_URL!;
+  if (raw !== raw.trim()) console.log("WARNING: the connection string has spaces or line breaks at the start or end");
+  const url = new URL(raw.trim().replace(/^postgres(ql)?:/, "http:"));
+  // Safe diagnostics: never prints the password itself.
   console.log(`Connecting as "${decodeURIComponent(url.username)}" to ${url.hostname}:${url.port || 5432}${url.pathname}`);
+  console.log(`Password check: ${describePassword(url.password)}`);
   await migrate(db, { migrationsFolder: "drizzle" });
   console.log("Migrations applied.");
 }
