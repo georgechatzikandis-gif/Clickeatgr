@@ -17,7 +17,7 @@ jobs:
           POSTGRES_DB: clickeat_test
         ports: ["5432:5432"]
         options: >-
-          --health-cmd "pg_isready -U clickeat" --health-interval 5s --health-timeout 5s --health-retries 10
+          --health-cmd "pg_isready -U clickeat -d clickeat_test" --health-interval 5s --health-timeout 5s --health-retries 10
     env:
       TEST_DATABASE_URL: postgres://clickeat:clickeat@localhost:5432/clickeat_test
     steps:
