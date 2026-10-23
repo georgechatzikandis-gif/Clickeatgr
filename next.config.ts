@@ -12,6 +12,8 @@ const nextConfig: NextConfig = {
   // Pages read live data (orders, opening status), so we use plain dynamic rendering.
   cacheComponents: false,
   poweredByHeader: false,
+  // Logos are small static files; on-the-fly optimisation would need a paid image service on Cloudflare.
+  images: { unoptimized: true },
   experimental: {
     // Images are shrunk in the browser before upload; this is a safety margin.
     serverActions: { bodySizeLimit: "5mb" },

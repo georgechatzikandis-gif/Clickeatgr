@@ -3,18 +3,19 @@
 This guide has **not** been executed yet: nothing is deployed until you complete these steps and we verify the
 live site together. Re-check every price on the vendor's own page before signing up.
 
-## 0. Decide the hosting option (see `docs/PLAN.md` §4)
+## 0. Hosting choice: Cloudflare Workers
 
-The app is a standard Next.js server app plus PostgreSQL, so any of these work without code changes.
+Chosen: **Cloudflare Workers** (with the `@opennextjs/cloudflare` adapter) and a Supabase database.
 
-| | Database | Web hosting | Fixed cost | Note |
-|---|---|---|---|---|
-| A | Supabase Free | Netlify Free | €0 | Check which region Netlify runs functions in: far from the database = slower pages |
-| B | Supabase Free | Vercel Pro (region `fra1`) | ~$20/mo | Vercel Hobby is **not allowed** for commercial use |
-| C | Same VPS | Small EU VPS + Docker | ~€5–8/mo | You maintain the server |
+| Plan | Cost | What to expect (measured locally, October 2026) |
+|---|---|---|
+| Workers Free | €0 | Site size 1.75 MB (limit 3 MB) ✅. **10 ms CPU per request**: customer pages are light, but staff **login** needs ~110 ms CPU for secure password checking and will probably be refused (error 1102). |
+| Workers Paid | $5/month | 30 s CPU per request, 10 MB size limit. Everything works. |
 
-Keep the database and the web functions in the **same region (Frankfurt, EU)**. That keeps pages fast and
-customer data inside the EU.
+Start on Free. If you see "Worker exceeded resource limits" (dashboard → Workers → clickeat → Logs) or cannot log in,
+switch to Paid in the dashboard: one click, no code change.
+
+The same code still runs on any Node.js host (Vercel Pro, a VPS) as a fallback.
 
 ## 1. Domain
 
@@ -40,24 +41,28 @@ because the name might be taken.
 
    Never run `db:seed:demo` against production.
 
-## 3. Web hosting
+## 3. Cloudflare Workers
 
-Connect the GitHub repository to the host and set:
+1. Create a free account at cloudflare.com.
+2. **Hyperdrive** (fast, pooled database connection, free): dashboard → *Storage & databases → Hyperdrive → Create*.
+   Use the Supabase **session pooler** URI (port **5432**, not the 6543 transaction pooler). Copy the Hyperdrive **ID**
+   and put it in `wrangler.jsonc`:
+   `"hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<hyperdrive-id>" }]` (commit this; the ID is not a secret).
+3. **Workers → Create → Import a repository** → choose this GitHub repository and set:
+   - Build command: `pnpm install --frozen-lockfile && pnpm cf:build`
+   - Deploy command: `npx opennextjs-cloudflare deploy`
+4. Worker → *Settings → Variables and secrets*: add **secret** `APP_SECRET` (output of
+   `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`).
+5. Every push to `main` now deploys automatically. Deploys are not limited on Workers.
 
-| Setting | Value |
-|---|---|
-| Build command | `pnpm build` |
-| Node version | 22 |
-| `DATABASE_URL` | Supabase **transaction pooler** URI (port 6543) |
-| `APP_SECRET` | output of `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
-| Function region | Frankfurt / EU Central |
-
-Environment variables are entered in the host's dashboard and **never** committed to GitHub.
+Test locally in Cloudflare's runtime before deploying: `pnpm cf:preview` (uses `.dev.vars`, see `.dev.vars.example`).
 
 ## 4. Point the domain to the host
 
-In the host's dashboard, add the domain. It shows DNS records (usually an `A` record and a `CNAME` for `www`).
-Add them at your registrar. HTTPS certificates are issued automatically (can take up to a few hours).
+1. Cloudflare dashboard → *Add a domain* → enter `clickeat.gr` → Free plan. Cloudflare shows two **nameservers**.
+2. At your Greek registrar, replace the domain's nameservers with Cloudflare's (can take a few hours).
+3. Workers → clickeat → *Settings → Domains & Routes → Add custom domain* → `clickeat.gr` and `www.clickeat.gr`.
+   HTTPS is automatic.
 
 ## 5. Backups (free, encrypted)
 

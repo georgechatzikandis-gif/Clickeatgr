@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "clickeat",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2026-10-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  // Runs the worker close to the database (Frankfurt) instead of close to each visitor.
+  "placement": { "mode": "smart" },
+  "observability": { "enabled": true }
+  // Database: add a Hyperdrive binding after creating it in the Cloudflare dashboard, e.g.
+  // "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<hyperdrive-id>" }]
+  // Secrets (APP_SECRET, and DATABASE_URL if not using Hyperdrive) are set with `wrangler secret put`.
+}

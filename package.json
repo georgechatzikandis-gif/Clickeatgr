@@ -15,16 +15,20 @@
     "db:seed": "tsx scripts/seed-base.ts",
     "db:seed:demo": "tsx scripts/seed-demo.ts",
     "user:create": "tsx scripts/create-user.ts",
-    "data:anonymize": "tsx scripts/anonymize-old-orders.ts"
+    "data:anonymize": "tsx scripts/anonymize-old-orders.ts",
+    "cf:build": "opennextjs-cloudflare build",
+    "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
   },
   "dependencies": {
+    "@opennextjs/cloudflare": "1.20.13",
     "drizzle-orm": "^0.45.4",
+    "image-size": "2.0.4",
     "next": "16.4.3",
     "postgres": "^3.4.9",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "server-only": "^0.0.1",
-    "sharp": "^0.35.5",
     "zod": "^4.6.7"
   },
   "devDependencies": {
@@ -40,7 +44,8 @@
     "tailwindcss": "^4",
     "tsx": "^4.23.15",
     "typescript": "^5",
-    "vitest": "^5.0.5"
+    "vitest": "^5.0.5",
+    "wrangler": "4.152.0"
   },
   "packageManager": "pnpm@10.28.0"
 }

@@ -31,7 +31,7 @@ Key decisions and why:
 | Auth | Own session auth for **staff only** (admin + business users), scrypt password hashing, DB-stored sessions, httpOnly cookies | Customers check out as guests, so only a handful of staff accounts exist. No third-party auth service is needed and there is nothing to pay for. |
 | Authorization | Every server action calls `requireAdmin()` or `requireBusinessUser()` and every business query is filtered by the business id **taken from the session**, never from the browser. Row-Level Security is enabled on all tables with no policies, so no database role other than the app's owner role can read anything (blocks Supabase's public Data API) | Real server-side enforcement, covered by automated tests. |
 | Real-time orders | Polling every 10 s while the dashboard is open, with sound + tab-title alerts | Free, works on any host, no WebSocket service. Plenty for 2–3 businesses. |
-| Images | Uploaded, resized to WebP (max 1200 px) with `sharp`, stored in Postgres, served with long cache headers | Zero extra services. ~100 KB/image → a few hundred images ≈ 30–50 MB. Can move to Supabase Storage / Cloudflare R2 later behind the same interface. |
+| Images | Shrunk to max 1600 px JPEG in the browser, validated on the server (real JPEG/PNG/WebP, size, dimensions; GPS/EXIF removed), stored in Postgres, served with long cache headers. No native image library, so it runs on Cloudflare | Zero extra services. ~100 KB/image → a few hundred images ≈ 30–50 MB. Can move to Supabase Storage / Cloudflare R2 later behind the same interface. |
 | Maps / addresses | No maps API. Each business defines **named delivery zones** (e.g. "Ρόδος – Πόλη", "Ιξιά", "Φαληράκι") with its own fee and minimum | No per-request costs; matches how local shops already price delivery. |
 | Email | Optional later (Resend free: ~3,000/month, 100/day). The platform works without it. | |
 | Rate limiting | Postgres table (fixed window) | No Redis needed. |
@@ -72,6 +72,10 @@ See `src/db/schema.ts` for the authoritative definition.
 5. Nothing is ever collected automatically in this version — it is only recorded for reporting.
 
 ## 4. Hosting & monthly cost
+
+> **Decision (Oct 2026): Cloudflare Workers** — see `docs/DEPLOYMENT.md` §0. Free plan to start, $5/month Paid plan if the
+> free CPU limit is hit (likely for staff login). Netlify was dropped: its free plan limits deploys (credits). The
+> analysis below is kept for reference.
 
 **Important findings (Oct 2026):**
 - **Vercel Hobby (free) forbids commercial use.** A real business needs Vercel Pro: **$20/month**.

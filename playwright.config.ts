@@ -15,10 +15,8 @@ export default defineConfig({
     { name: "mobile", use: { ...devices["iPhone 13"], browserName: "chromium" } },
     { name: "desktop", use: { ...devices["Desktop Chrome"] } },
   ],
-  webServer: {
-    command: "pnpm dev",
-    url: "http://localhost:3000",
-    reuseExistingServer: true,
-    timeout: 120_000,
-  },
+  // With E2E_BASE_URL (e.g. the Cloudflare preview on :8787) the server is started separately.
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : { command: "pnpm dev", url: "http://localhost:3000", reuseExistingServer: true, timeout: 120_000 },
 });
