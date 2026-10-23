@@ -130,3 +130,21 @@ I am not a lawyer; please confirm these with a Greek accountant/lawyer.
 - **Admins cannot edit a business's menu directly** (they can edit profile, status, trial/commission, zones and
   accounts). A business user does the menu, or the admin creates a business login for themselves.
 - **No scheduled/pre-orders, discounts or coupons.** The `discount_cents` field exists for later.
+
+## 8. Ideas from large delivery apps (efood, Wolt) — backlog
+
+Done: remembered customer details and "order again" (stored only on the customer's device), home sorting,
+menu search, automatic "Popular" section, live re-pricing of the cart at checkout.
+
+Candidates, roughly in order of value for a small launch (all free unless noted):
+
+| Idea | Effort | Notes |
+|---|---|---|
+| Ratings & short reviews after a completed order | Medium | Needs moderation rules; only meaningful with more orders |
+| Scheduled orders (choose a later time today) | Medium | Business must see them separately from "now" orders |
+| Offers / discount codes per business | Medium | `discount_cents` already exists; commission is calculated after discounts |
+| English language | Medium | Useful in tourist season |
+| Email confirmation to the customer | Small | Resend free tier (~3,000/month) — needs your approval |
+| Business "busy mode" (+15′ to prep time) | Small | One toggle on the dashboard |
+| Online card payments, tips | Large | Stage 5 — Stripe/Viva; costs and legal setup to be explained first |
+| Courier live tracking | Large | Not needed: businesses deliver with their own staff |

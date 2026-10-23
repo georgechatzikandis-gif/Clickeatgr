@@ -35,10 +35,10 @@ test("order page requires the secret token", async ({ page }) => {
 
 test("cart is limited to one business", async ({ page }) => {
   await page.goto("/r/demo-cafe");
-  await page.getByRole("button", { name: /Πορτοκαλόπιτα/ }).click();
+  await page.getByRole("button", { name: /Πορτοκαλόπιτα/ }).first().click();
   await page.getByRole("button", { name: /Προσθήκη/ }).click();
   await page.goto("/r/demo-pizza");
-  await page.getByRole("button", { name: /Χωριάτικη/ }).click();
+  await page.getByRole("button", { name: /Χωριάτικη/ }).first().click();
   page.once("dialog", (d) => d.dismiss());
   await page.getByRole("button", { name: /Προσθήκη/ }).click();
   // Dismissed: the cart still belongs to the café.

@@ -26,7 +26,7 @@ export default async function BusinessPage(props: PageProps<"/r/[slug]">) {
         )}
       </div>
       <div className="mx-auto max-w-6xl px-4">
-        <div className="-mt-10 flex items-end gap-3">
+        <div className="relative z-10 -mt-10 flex items-end gap-3">
           <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-2xl border-4 border-white bg-white text-3xl shadow">
             {b.logoImageId ? (
               // eslint-disable-next-line @next/next/no-img-element

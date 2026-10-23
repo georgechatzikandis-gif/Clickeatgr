@@ -6,7 +6,7 @@ import { rateLimit } from "@/server/rate-limit";
 import { clientIpHash } from "@/server/request";
 
 export type PlaceOrderResult =
-  | { ok: true; orderId: string; token: string }
+  | { ok: true; orderId: string; token: string; reference: string; totalCents: number }
   | { ok: false; error: string; fieldErrors?: Record<string, string> };
 
 export async function placeOrderAction(input: PlaceOrderInput): Promise<PlaceOrderResult> {
@@ -27,7 +27,7 @@ export async function placeOrderAction(input: PlaceOrderInput): Promise<PlaceOrd
 
   try {
     const order = await placeOrder(parsed.data);
-    return { ok: true, orderId: order.id, token: order.accessToken };
+    return { ok: true, orderId: order.id, token: order.accessToken, reference: order.reference, totalCents: order.totalCents };
   } catch (e) {
     if (e instanceof OrderError) return { ok: false, error: e.message };
     console.error("placeOrder failed", e);

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { addToCart, cartCount, cartSubtotal, setQuantity, useCart } from "@/lib/cart";
 import { formatEuro } from "@/lib/money";
 import type { PublicMenuProduct } from "@/server/catalog";
@@ -11,7 +11,19 @@ type Section = { id: string; name: string; products: PublicMenuProduct[] };
 
 export function MenuView({ business, sections, canOrder }: { business: Business; sections: Section[]; canOrder: boolean }) {
   const [selected, setSelected] = useState<PublicMenuProduct | null>(null);
+  const [q, setQ] = useState("");
   const cart = useCart();
+  const shown = useMemo(() => {
+    const nq = normalize(q.trim());
+    if (!nq) return sections;
+    // While searching, show one flat list of matches (without the duplicated "Popular" section).
+    const seen = new Set<string>();
+    const matches = sections
+      .filter((s) => s.id !== "popular")
+      .flatMap((s) => s.products)
+      .filter((p) => !seen.has(p.id) && seen.add(p.id) && normalize(`${p.name} ${p.description}`).includes(nq));
+    return [{ id: "search", name: `Αποτελέσματα για «${q.trim()}»`, products: matches }];
+  }, [q, sections]);
   const ownCart = cart?.businessId === business.id ? cart : null;
   const count = cartCount(ownCart);
 
@@ -31,17 +43,28 @@ export function MenuView({ business, sections, canOrder }: { business: Business;
             Το κατάστημα δεν δέχεται παραγγελίες αυτή τη στιγμή. Μπορείτε να δείτε τον κατάλογο.
           </div>
         )}
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder="Αναζήτηση στον κατάλογο…"
+          aria-label="Αναζήτηση στον κατάλογο"
+          className="input mb-2"
+        />
         <nav
           className="sticky top-16 z-20 -mx-4 flex gap-2 overflow-x-auto border-b border-line bg-white px-4 py-2 [scrollbar-width:none]"
           aria-label="Κατηγορίες καταλόγου"
         >
-          {sections.map((s) => (
+          {shown.map((s) => (
             <a key={s.id} href={`#sec-${s.id}`} className="shrink-0 rounded-full bg-surface px-3 py-1.5 text-sm font-medium hover:bg-brand-soft">
               {s.name}
             </a>
           ))}
         </nav>
-        {sections.map((s) => (
+        {shown[0]?.id === "search" && !shown[0].products.length && (
+          <p className="py-6 text-center text-ink-soft">Δεν βρέθηκαν προϊόντα.</p>
+        )}
+        {shown.map((s) => (
           <section key={s.id} id={`sec-${s.id}`} className="scroll-mt-32 pt-6">
             <h2 className="text-lg font-bold">{s.name}</h2>
             <ul className="mt-3 grid gap-3 md:grid-cols-2">
@@ -127,6 +150,12 @@ export function MenuView({ business, sections, canOrder }: { business: Business;
     </div>
   );
 }
+
+const normalize = (s: string) =>
+  s
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
 
 export function QtyControl({ value, onChange }: { value: number; onChange: (q: number) => void }) {
   return (

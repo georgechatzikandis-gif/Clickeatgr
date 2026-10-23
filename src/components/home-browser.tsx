@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { BusinessCard as Card } from "@/server/catalog";
 import { BusinessCard } from "./business-card";
+import { RecentOrders } from "./recent-orders";
 
 type Category = { slug: string; name: string; icon: string };
 
@@ -17,17 +18,28 @@ export function HomeBrowser({ businesses, categories }: { businesses: Card[]; ca
   const [cat, setCat] = useState<string | null>(null);
   const [openOnly, setOpenOnly] = useState(false);
   const [mode, setMode] = useState<"all" | "delivery" | "pickup">("all");
+  const [sort, setSort] = useState<"recommended" | "fastest" | "min" | "fee">("recommended");
 
   const filtered = useMemo(() => {
     const nq = norm(q.trim());
-    return businesses.filter(
+    const list = businesses.filter(
       (b) =>
         (!cat || b.categorySlugs.includes(cat)) &&
         (!openOnly || b.isOpen) &&
         (mode === "all" || (mode === "delivery" ? b.acceptsDelivery : b.acceptsPickup)) &&
         (!nq || norm(`${b.name} ${b.description} ${b.categoryNames.join(" ")} ${b.productNames}`).includes(nq)),
     );
-  }, [businesses, q, cat, openOnly, mode]);
+    const eta = (b: Card) => b.prepTimeMinutes + (b.acceptsDelivery ? b.deliveryTimeMinutes : 0);
+    const key: Record<typeof sort, ((b: Card) => number) | null> = {
+      recommended: null, // server order: open first
+      fastest: eta,
+      min: (b) => b.minOrderCents ?? 0,
+      fee: (b) => b.minDeliveryFeeCents ?? Number.MAX_SAFE_INTEGER,
+    };
+    const k = key[sort];
+    // Open businesses always stay above closed ones.
+    return k ? [...list].sort((a, b) => Number(b.isOpen) - Number(a.isOpen) || k(a) - k(b)) : list;
+  }, [businesses, q, cat, openOnly, mode, sort]);
 
   const chip = (active: boolean) =>
     `shrink-0 rounded-full border px-3.5 py-2 text-sm font-medium transition ${
@@ -58,6 +70,8 @@ export function HomeBrowser({ businesses, categories }: { businesses: Card[]; ca
         </div>
       </section>
 
+      <RecentOrders />
+
       <div className="mx-auto max-w-6xl px-4">
         <div className="-mx-4 flex gap-2 overflow-x-auto px-4 pb-2 pt-1 [scrollbar-width:none]" role="toolbar" aria-label="Κατηγορίες">
           <button className={chip(cat === null)} onClick={() => setCat(null)}>
@@ -83,6 +97,17 @@ export function HomeBrowser({ businesses, categories }: { businesses: Card[]; ca
             <option value="all">Διανομή & παραλαβή</option>
             <option value="delivery">Μόνο διανομή</option>
             <option value="pickup">Μόνο παραλαβή</option>
+          </select>
+          <select
+            value={sort}
+            onChange={(e) => setSort(e.target.value as typeof sort)}
+            className="rounded-full border border-line bg-white px-3 py-1.5"
+            aria-label="Ταξινόμηση"
+          >
+            <option value="recommended">Προτεινόμενα</option>
+            <option value="fastest">Ταχύτερη παράδοση</option>
+            <option value="min">Χαμηλότερη ελάχιστη παραγγελία</option>
+            <option value="fee">Χαμηλότερο κόστος διανομής</option>
           </select>
           <span className="ml-auto text-ink-soft">{filtered.length} καταστήματα</span>
         </div>

@@ -1,5 +1,5 @@
 import "server-only";
-import { and, asc, eq, inArray, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   businessCategories,
@@ -10,6 +10,8 @@ import {
   menuCategories,
   optionGroups,
   options,
+  orderItems,
+  orders,
   products,
   regions,
 } from "@/db/schema";
@@ -166,6 +168,13 @@ export async function getBusinessPage(slug: string, now = new Date()) {
   );
   if (uncategorised.length) sections.push({ id: "other", name: "Άλλα", products: uncategorised });
 
+  // "Popular": most ordered in the last 60 days (at least 3 different orders), shown first.
+  const popularIds = await popularProductIds(b.id);
+  const popular = popularIds
+    .map((id) => menuProducts.find((p) => p.id === id && p.isAvailable))
+    .filter((p): p is (typeof menuProducts)[number] => !!p);
+  if (popular.length >= 2) sections.unshift({ id: "popular", name: "Δημοφιλή", products: popular });
+
   return {
     business: b,
     hours,
@@ -174,6 +183,25 @@ export async function getBusinessPage(slug: string, now = new Date()) {
     isOpen: !b.temporarilyClosed && isOpenAt(hours, now),
     acceptsDelivery: b.acceptsDelivery && zones.length > 0,
   };
+}
+
+async function popularProductIds(businessId: string): Promise<string[]> {
+  const rows = await db
+    .select({ productId: orderItems.productId })
+    .from(orderItems)
+    .innerJoin(orders, eq(orders.id, orderItems.orderId))
+    .where(
+      and(
+        eq(orders.businessId, businessId),
+        sql`${orders.createdAt} > now() - interval '60 days'`,
+        sql`${orders.status} not in ('rejected', 'cancelled')`,
+      ),
+    )
+    .groupBy(orderItems.productId)
+    .having(sql`count(distinct ${orderItems.orderId}) >= 3`)
+    .orderBy(sql`sum(${orderItems.quantity}) desc`)
+    .limit(5);
+  return rows.map((r) => r.productId).filter((id): id is string => !!id);
 }
 
 export async function loadGroups(productIds: string[]) {

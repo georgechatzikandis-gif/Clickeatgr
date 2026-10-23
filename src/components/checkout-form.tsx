@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { placeOrderAction } from "@/app/actions/order";
-import { cartSubtotal, clearCart, setQuantity, useCart, useHydrated } from "@/lib/cart";
+import { clearCart, setQuantity, useCart, useHydrated, type CartLine } from "@/lib/cart";
+import { loadProfile, rememberOrder, saveProfile } from "@/lib/customer";
 import { formatEuro } from "@/lib/money";
 import { QtyControl } from "./menu-view";
 
@@ -21,46 +22,74 @@ type Business = {
   address: string;
 };
 type Zone = { id: string; name: string; feeCents: number; minOrderCents: number };
+/** Current prices and availability from the database, keyed by product id. */
+export type LiveMenu = Record<
+  string,
+  { priceCents: number; isAvailable: boolean; options: Record<string, { priceDeltaCents: number; isAvailable: boolean }> }
+>;
+type Props = { business: Business; zones: Zone[]; menu: LiveMenu };
+type LiveLine = CartLine & { unavailable: boolean; priceChanged: boolean };
 
-export function CheckoutForm({ business, zones }: { business: Business; zones: Zone[] }) {
-  const router = useRouter();
-  const cart = useCart();
-  const [pending, startTransition] = useTransition();
-  // One key per checkout: retries after a network error can never create a second order.
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
-  const [step, setStep] = useState<"form" | "review">("form");
-  const [error, setError] = useState<string | null>(null);
-  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
-  const [f, setF] = useState({
-    fulfillment: (business.acceptsDelivery ? "delivery" : "pickup") as "delivery" | "pickup",
-    deliveryZoneId: zones[0]?.id ?? "",
-    customerName: "",
-    customerPhone: "",
-    customerEmail: "",
-    address: "",
-    addressDetails: "",
-    notes: "",
-    acceptTerms: false,
+/** Re-prices browser cart lines with the live menu, so the customer never sees outdated prices. */
+function refreshLines(lines: CartLine[], menu: LiveMenu): LiveLine[] {
+  return lines.map((l) => {
+    const p = menu[l.productId];
+    const ok = !!p && p.isAvailable && l.optionIds.every((id) => p.options[id]?.isAvailable);
+    if (!ok) return { ...l, unavailable: true, priceChanged: false };
+    const unit = p.priceCents + l.optionIds.reduce((s, id) => s + p.options[id].priceDeltaCents, 0);
+    return { ...l, unitPriceCents: unit, unavailable: false, priceChanged: unit !== l.unitPriceCents };
   });
-  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
+}
 
+export function CheckoutForm(props: Props) {
+  const cart = useCart();
   const hydrated = useHydrated();
-  const lines = cart?.businessId === business.id ? cart.lines : [];
+  const lines = cart?.businessId === props.business.id ? cart.lines : [];
   if (!hydrated) return <div className="card mt-6 h-64 animate-pulse bg-surface" aria-busy="true" />;
   if (!lines.length) {
     return (
       <div className="card mt-6 p-8 text-center">
         <p className="text-4xl" aria-hidden>🛒</p>
         <p className="mt-2 font-semibold">Το καλάθι σας είναι άδειο</p>
-        <Link href={`/r/${business.slug}`} className="btn-primary mt-4">
+        <Link href={`/r/${props.business.slug}`} className="btn-primary mt-4">
           Επιστροφή στον κατάλογο
         </Link>
       </div>
     );
   }
+  // Rendered only in the browser, so saved details can be read when the form is created.
+  return <CheckoutInner {...props} lines={refreshLines(lines, props.menu)} />;
+}
+
+function CheckoutInner({ business, zones, lines }: Props & { lines: LiveLine[] }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  // One key per checkout: retries after a network error can never create a second order.
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [step, setStep] = useState<"form" | "review">("form");
+  const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [saved] = useState(loadProfile);
+  const [remember, setRemember] = useState(true);
+  const [f, setF] = useState({
+    fulfillment: (business.acceptsDelivery ? "delivery" : "pickup") as "delivery" | "pickup",
+    deliveryZoneId: zones[0]?.id ?? "",
+    customerName: saved?.customerName ?? "",
+    customerPhone: saved?.customerPhone ?? "",
+    customerEmail: saved?.customerEmail ?? "",
+    address: saved?.address ?? "",
+    addressDetails: saved?.addressDetails ?? "",
+    notes: "",
+    acceptTerms: false,
+  });
+  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
+
+  const unavailable = lines.filter((l) => l.unavailable);
+  const priceChanged = lines.some((l) => l.priceChanged);
+  const orderable = lines.filter((l) => !l.unavailable);
 
   const zone = zones.find((z) => z.id === f.deliveryZoneId);
-  const subtotal = cartSubtotal(cart);
+  const subtotal = orderable.reduce((sum, l) => sum + l.unitPriceCents * l.quantity, 0);
   const deliveryFee = f.fulfillment === "delivery" ? (zone?.feeCents ?? 0) : 0;
   const minOrder = f.fulfillment === "delivery" ? (zone?.minOrderCents ?? 0) : business.pickupMinOrderCents;
   const belowMin = subtotal < minOrder;
@@ -96,9 +125,34 @@ export function CheckoutForm({ business, zones }: { business: Business; zones: Z
           addressDetails: f.addressDetails,
           notes: f.notes,
           acceptTerms: f.acceptTerms as true,
-          lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity, optionIds: l.optionIds, notes: l.notes })),
+          lines: orderable.map((l) => ({ productId: l.productId, quantity: l.quantity, optionIds: l.optionIds, notes: l.notes })),
         });
         if (res.ok) {
+          saveProfile(
+            remember
+              ? { customerName: f.customerName, customerPhone: f.customerPhone, customerEmail: f.customerEmail, address: f.address, addressDetails: f.addressDetails }
+              : null,
+          );
+          rememberOrder({
+            id: res.orderId,
+            token: res.token,
+            reference: res.reference,
+            businessId: business.id,
+            businessSlug: business.slug,
+            businessName: business.name,
+            totalCents: res.totalCents,
+            createdAt: new Date().toISOString(),
+            lines: orderable.map((l) => ({
+              key: l.key,
+              productId: l.productId,
+              name: l.name,
+              optionIds: l.optionIds,
+              optionLabels: l.optionLabels,
+              unitPriceCents: l.unitPriceCents,
+              quantity: l.quantity,
+              notes: l.notes,
+            })),
+          });
           clearCart();
           router.replace(`/order/${res.orderId}?t=${encodeURIComponent(res.token)}`);
           return;
@@ -126,7 +180,7 @@ export function CheckoutForm({ business, zones }: { business: Business; zones: Z
       <h2 className="font-bold">Η παραγγελία σας</h2>
       <ul className="mt-2 divide-y divide-line">
         {lines.map((l) => (
-          <li key={l.key} className="py-2.5 text-sm">
+          <li key={l.key} className={`py-2.5 text-sm ${l.unavailable ? "opacity-60" : ""}`}>
             <div className="flex justify-between gap-3">
               <span className="font-medium">
                 {step === "review" && `${l.quantity}× `}
@@ -136,6 +190,7 @@ export function CheckoutForm({ business, zones }: { business: Business; zones: Z
             </div>
             {l.optionLabels.length > 0 && <p className="text-xs text-ink-soft">{l.optionLabels.join(", ")}</p>}
             {l.notes && <p className="text-xs italic text-ink-soft">«{l.notes}»</p>}
+            {l.unavailable && <p className="text-xs font-semibold text-danger">Δεν είναι πλέον διαθέσιμο</p>}
             {step === "form" && <QtyControl value={l.quantity} onChange={(q) => setQuantity(l.key, q)} />}
           </li>
         ))}
@@ -160,6 +215,17 @@ export function CheckoutForm({ business, zones }: { business: Business; zones: Z
           <dd className="text-right">{payment}</dd>
         </div>
       </dl>
+      {priceChanged && (
+        <p className="mt-3 rounded-lg bg-amber-50 p-2 text-sm text-brand-dark">Ορισμένες τιμές άλλαξαν από το κατάστημα και ενημερώθηκαν.</p>
+      )}
+      {unavailable.length > 0 && (
+        <div className="mt-3 rounded-lg bg-red-50 p-2 text-sm text-danger">
+          <p>{unavailable.length === 1 ? "Ένα προϊόν δεν είναι πλέον διαθέσιμο." : `${unavailable.length} προϊόντα δεν είναι πλέον διαθέσιμα.`}</p>
+          <button type="button" className="mt-1 font-semibold underline" onClick={() => unavailable.forEach((l) => setQuantity(l.key, 0))}>
+            Αφαίρεση από το καλάθι
+          </button>
+        </div>
+      )}
       {belowMin && (
         <p className="mt-3 rounded-lg bg-amber-50 p-2 text-sm text-brand-dark">
           Η ελάχιστη παραγγελία είναι {formatEuro(minOrder)}. Προσθέστε ακόμη {formatEuro(minOrder - subtotal)}.
@@ -216,7 +282,7 @@ export function CheckoutForm({ business, zones }: { business: Business; zones: Z
       onSubmit={(e) => {
         e.preventDefault();
         setError(null);
-        if (validateLocally() && !belowMin) setStep("review");
+        if (validateLocally() && !belowMin && !unavailable.length) setStep("review");
       }}
     >
       <div className="space-y-6">
@@ -300,6 +366,10 @@ export function CheckoutForm({ business, zones }: { business: Business; zones: Z
         </div>
 
         <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1 h-4 w-4 accent-amber-500" checked={remember} onChange={(e) => setRemember(e.target.checked)} />
+          <span>Να θυμάται αυτή η συσκευή τα στοιχεία μου για την επόμενη παραγγελία (αποθηκεύονται μόνο στη συσκευή σας).</span>
+        </label>
+        <label className="flex items-start gap-2 text-sm">
           <input type="checkbox" className="mt-1 h-4 w-4 accent-amber-500" checked={f.acceptTerms} onChange={(e) => set("acceptTerms", e.target.checked)} />
           <span>
             Αποδέχομαι τους <Link href="/terms" target="_blank" className="underline">όρους χρήσης</Link> και έχω διαβάσει την{" "}
@@ -312,7 +382,7 @@ export function CheckoutForm({ business, zones }: { business: Business; zones: Z
 
       <div className="space-y-3 md:sticky md:top-20 md:self-start">
         {summary}
-        <button type="submit" className="btn-primary w-full !py-3.5 text-base" disabled={belowMin || !business.isOpen}>
+        <button type="submit" className="btn-primary w-full !py-3.5 text-base" disabled={belowMin || !business.isOpen || unavailable.length > 0}>
           Έλεγχος παραγγελίας
         </button>
         <Link href={`/r/${business.slug}`} className="block text-center text-sm text-ink-soft underline">

@@ -25,7 +25,7 @@ import { getPlatformSettings } from "./settings";
 /** Error whose message is safe to show to the customer / staff. */
 export class OrderError extends Error {}
 
-export type PlacedOrder = { id: string; reference: string; accessToken: string; duplicate: boolean };
+export type PlacedOrder = { id: string; reference: string; accessToken: string; totalCents: number; duplicate: boolean };
 
 const REF_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"; // no 0/O/1/I/L
 function newReference(): string {
@@ -36,7 +36,7 @@ function newReference(): string {
 
 async function findByIdempotencyKey(key: string): Promise<PlacedOrder | null> {
   const [o] = await db
-    .select({ id: orders.id, reference: orders.reference, accessToken: orders.accessToken })
+    .select({ id: orders.id, reference: orders.reference, accessToken: orders.accessToken, totalCents: orders.totalCents })
     .from(orders)
     .where(eq(orders.idempotencyKey, key))
     .limit(1);
@@ -181,7 +181,7 @@ async function placeOrderTx(tx: Tx, input: PlaceOrderData, now: Date): Promise<P
       commissionCents: commission.commissionCents,
       commissionStatus: commission.status,
     })
-    .returning({ id: orders.id, reference: orders.reference });
+    .returning({ id: orders.id, reference: orders.reference, totalCents: orders.totalCents });
 
   await tx.insert(orderItems).values(
     priced.lines.map((l) => ({
@@ -208,7 +208,7 @@ async function placeOrderTx(tx: Tx, input: PlaceOrderData, now: Date): Promise<P
     note: commission.isTrial ? "Δωρεάν δοκιμαστική περίοδος — 0%" : null,
   });
 
-  return { id: order.id, reference: order.reference, accessToken, duplicate: false };
+  return { ...order, accessToken, duplicate: false };
 }
 
 export type StatusActor = { userId: string; role: "admin" | "business"; businessId: string | null };

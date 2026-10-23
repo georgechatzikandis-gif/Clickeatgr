@@ -12,6 +12,13 @@ export async function shot(page: Page, info: TestInfo, name: string) {
   if (dir) await page.screenshot({ path: `${dir}/${info.project.name}-${name}.png`, fullPage: true });
 }
 
+/** Runs one SQL statement against the local demo database (test setup only). */
+export async function sqlExec(query: string) {
+  const sql = postgres(process.env.DATABASE_URL!, { max: 1, onnotice: () => {} });
+  await sql.unsafe(query);
+  await sql.end();
+}
+
 /** The tests place many orders from one IP; reset the per-IP order limit so they aren't blocked. */
 export async function resetRateLimits() {
   const sql = postgres(process.env.DATABASE_URL!, { max: 1, onnotice: () => {} });
@@ -26,7 +33,7 @@ export async function placeDemoPizzaOrder(page: Page, info?: TestInfo) {
   await page.getByRole("link", { name: /Πιτσαρία/ }).click();
   await page.waitForURL("**/r/demo-pizza");
   if (info) await shot(page, info, "2-menu");
-  await page.getByRole("button", { name: /Μαργαρίτα/ }).click();
+  await page.getByRole("button", { name: /Μαργαρίτα/ }).first().click();
   await page.getByLabel("Μεγάλη").check();
   await page.getByLabel("Μπέικον").check();
   if (info) await shot(page, info, "3-product");

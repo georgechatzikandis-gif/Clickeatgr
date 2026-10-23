@@ -94,6 +94,11 @@ export function setQuantity(key: string, quantity: number) {
   write({ ...c, lines });
 }
 
+/** Replaces the whole cart (used by "order again"). */
+export function replaceCart(cart: Cart) {
+  write(cart);
+}
+
 export function clearCart() {
   write(null);
 }
