@@ -12,8 +12,16 @@
   },
   // Runs the worker close to the database (Frankfurt) instead of close to each visitor.
   "placement": { "mode": "smart" },
-  "observability": { "enabled": true }
-  // Database: add a Hyperdrive binding after creating it in the Cloudflare dashboard, e.g.
-  // "hyperdrive": [{ "binding": "HYPERDRIVE", "id": "<hyperdrive-id>" }]
-  // Secrets (APP_SECRET, and DATABASE_URL if not using Hyperdrive) are set with `wrangler secret put`.
+  "observability": { "enabled": true },
+  // Database: Hyperdrive config "clickeat-db" → Supabase (Frankfurt, session pooler), caching off.
+  // The ID is not a secret; the database password is stored encrypted inside Hyperdrive.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "d407ab6e318a433cab852f6f7031a65d",
+      // Used only by `wrangler dev` / `pnpm cf:preview` on a developer machine.
+      "localConnectionString": "postgres://clickeat:clickeat@localhost:5432/clickeat"
+    }
+  ]
+  // Secret APP_SECRET is set in the dashboard (Worker → Settings → Variables and secrets).
 }
