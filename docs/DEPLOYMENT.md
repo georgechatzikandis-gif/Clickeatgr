@@ -70,7 +70,7 @@ The repository includes `.github/workflows/backup.yml`, which dumps the database
 days of copies in GitHub Actions.
 
 1. GitHub → repository → **Settings → Secrets and variables → Actions → New repository secret**:
-   - `PRODUCTION_DATABASE_URL` = Supabase **session pooler** URI
+   - `SUPABASE_DB_PASSWORD` = only the Supabase database password (the workflows build the connection string)
    - `BACKUP_PASSPHRASE` = a long random passphrase. **Store it in your password manager** — without it the
      backups cannot be opened.
 2. **Actions → Nightly database backup → Run workflow** once, and check that a `.gpg` file appears.

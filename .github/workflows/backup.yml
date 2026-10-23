@@ -2,7 +2,7 @@ name: Nightly database backup
 
 # Dumps the production database every night, encrypts it with BACKUP_PASSPHRASE and keeps it
 # as a workflow artifact for 30 days. Encryption matters: artifacts must never expose customer data.
-# Required repository secrets: PRODUCTION_DATABASE_URL (direct connection, port 5432) and BACKUP_PASSPHRASE.
+# Required repository secrets: SUPABASE_DB_PASSWORD and BACKUP_PASSPHRASE.
 
 on:
   schedule:
@@ -12,22 +12,30 @@ on:
 jobs:
   backup:
     runs-on: ubuntu-latest
-    container: postgres:17
     env:
-      DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
       PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
     steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/db-url
+        with:
+          password: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          url: ${{ secrets.PRODUCTION_DATABASE_URL }}
+      - name: Install pg_dump 17
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17 >/dev/null
       - name: Check secrets
         run: |
-          if [ -z "$DATABASE_URL" ] || [ -z "$PASSPHRASE" ]; then
+          if [ -z "$PASSPHRASE" ]; then
             echo "Backup secrets are not configured yet; skipping."; echo "SKIP=1" >> "$GITHUB_ENV"
           fi
       - name: Dump and encrypt
         if: env.SKIP != '1'
         run: |
-          apt-get update -qq && apt-get install -y -qq gnupg >/dev/null
           FILE="clickeat-$(date -u +%Y%m%d-%H%M).dump"
-          pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL" > "$FILE"
+          /usr/lib/postgresql/17/bin/pg_dump --format=custom --no-owner --no-privileges "$DATABASE_URL" > "$FILE"
           gpg --batch --yes --pinentry-mode loopback --passphrase "$PASSPHRASE" --symmetric --cipher-algo AES256 -o "$FILE.gpg" "$FILE"
           rm "$FILE"
           ls -lh "$FILE.gpg"
