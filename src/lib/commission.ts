@@ -60,3 +60,11 @@ export function calculateCommission(
 export function formatRate(bps: number): string {
   return `${(bps / 100).toLocaleString("el-GR", { maximumFractionDigits: 2 })}%`;
 }
+
+/** Human-readable trial status. trialEndsAt is the first moment AFTER the trial. */
+export function trialLabel(trialEndsAt: Date | null, now = new Date()): string {
+  if (!trialEndsAt) return "Δωρεάν περίοδος (χωρίς λήξη)";
+  if (trialEndsAt <= now) return "Η δωρεάν περίοδος έληξε";
+  const last = new Date(trialEndsAt.getTime() - 1).toLocaleDateString("el-GR", { timeZone: "Europe/Athens" });
+  return `Δωρεάν έως ${last}`;
+}
