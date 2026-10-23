@@ -54,3 +54,36 @@ export function describeDay(hours: HoursRange[], weekday: number): string | null
     );
   return ranges.length ? ranges.join(", ") : null;
 }
+
+/** Start of the given Athens calendar day (y, m 1-12, d) as a UTC Date. */
+export function athensDate(y: number, m: number, d: number, timeZone = TIME_ZONE): Date {
+  const guess = new Date(Date.UTC(y, m - 1, d, 12));
+  const p = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      year: "numeric",
+      month: "numeric",
+      day: "numeric",
+      hour: "numeric",
+      minute: "numeric",
+      hourCycle: "h23",
+    })
+      .formatToParts(guess)
+      .map((x) => [x.type, Number(x.value)]),
+  );
+  const offset = Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - guess.getTime();
+  return new Date(Date.UTC(y, m - 1, d) - offset);
+}
+
+/** Midnight (Athens) of the day containing `date`. */
+export function athensStartOfDay(date = new Date(), timeZone = TIME_ZONE): Date {
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" })
+    .format(date)
+    .split("-")
+    .map(Number);
+  return athensDate(y, m, d, timeZone);
+}
+
+export function formatAthens(date: Date, opts: Intl.DateTimeFormatOptions = { dateStyle: "short", timeStyle: "short" }) {
+  return date.toLocaleString("el-GR", { timeZone: TIME_ZONE, ...opts });
+}

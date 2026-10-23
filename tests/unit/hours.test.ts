@@ -31,3 +31,12 @@ describe("opening hours (Europe/Athens)", () => {
     expect(isOpenAt([], new Date())).toBe(false);
   });
 });
+
+import { athensDate, athensStartOfDay } from "@/lib/hours";
+describe("Athens day boundaries", () => {
+  it("computes midnight in summer and winter time", () => {
+    expect(athensDate(2026, 7, 1).toISOString()).toBe("2026-06-30T21:00:00.000Z");
+    expect(athensDate(2026, 12, 1).toISOString()).toBe("2026-11-30T22:00:00.000Z");
+    expect(athensStartOfDay(new Date("2026-10-23T22:30:00Z")).toISOString()).toBe("2026-10-23T21:00:00.000Z");
+  });
+});
