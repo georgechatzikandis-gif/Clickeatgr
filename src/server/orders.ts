@@ -212,6 +212,7 @@ async function placeOrderTx(tx: Tx, input: PlaceOrderData, now: Date): Promise<P
 }
 
 export type StatusActor = { userId: string; role: "admin" | "business"; businessId: string | null };
+const MAX_ETA_MINUTES = 240;
 
 /**
  * Changes an order's status. Business users can only touch orders of their own business
@@ -222,7 +223,14 @@ export async function updateOrderStatus(
   to: OrderStatus,
   actor: StatusActor,
   note?: string,
+  opts: { estimatedMinutes?: number } = {},
 ): Promise<void> {
+  if (to === "accepted") {
+    const m = opts.estimatedMinutes;
+    if (!Number.isInteger(m) || m! < 1 || m! > MAX_ETA_MINUTES) {
+      throw new OrderError("Επιλέξτε σε πόσα λεπτά θα είναι έτοιμη η παραγγελία.");
+    }
+  }
   await db.transaction(async (tx) => {
     const scope =
       actor.role === "admin" ? eq(orders.id, orderId) : and(eq(orders.id, orderId), eq(orders.businessId, actor.businessId!));
@@ -236,7 +244,11 @@ export async function updateOrderStatus(
 
     const now = new Date();
     const patch: Partial<typeof orders.$inferInsert> = { status: to };
-    if (to === "accepted") patch.acceptedAt = now;
+    if (to === "accepted") {
+      patch.acceptedAt = now;
+      patch.estimatedMinutes = opts.estimatedMinutes!;
+      patch.estimatedAt = new Date(now.getTime() + opts.estimatedMinutes! * 60_000);
+    }
     if (to === "completed") patch.completedAt = now;
     if (to === "cancelled" || to === "rejected") {
       patch.cancelledAt = now;
@@ -280,5 +292,38 @@ export async function updateOrderStatus(
       note: note?.slice(0, 300) ?? null,
     });
     if (ledger) await tx.insert(commissionLedger).values(ledger);
+  });
+}
+
+/**
+ * Pushes the expected time of an open, accepted order back by `minutes` (e.g. the kitchen is busy).
+ * Only the order's own business can do this.
+ */
+export async function delayOrder(orderId: string, minutes: number, actor: StatusActor): Promise<void> {
+  if (!Number.isInteger(minutes) || minutes < 1 || minutes > 60) throw new OrderError("Μη έγκυρη καθυστέρηση.");
+  await db.transaction(async (tx) => {
+    const [o] = await tx
+      .select()
+      .from(orders)
+      .where(and(eq(orders.id, orderId), eq(orders.businessId, actor.businessId ?? "")))
+      .for("update")
+      .limit(1);
+    if (!o) throw new OrderError("Η παραγγελία δεν βρέθηκε.");
+    if (!["accepted", "preparing", "ready", "out_for_delivery"].includes(o.status) || !o.estimatedAt) {
+      throw new OrderError("Η καθυστέρηση ισχύει μόνο για αποδεκτές παραγγελίες σε εξέλιξη.");
+    }
+    const total = (o.estimatedMinutes ?? 0) + minutes;
+    if (total > MAX_ETA_MINUTES) throw new OrderError("Ο χρόνος δεν μπορεί να ξεπεράσει τις 4 ώρες.");
+    await tx
+      .update(orders)
+      .set({ estimatedMinutes: total, estimatedAt: new Date(o.estimatedAt.getTime() + minutes * 60_000) })
+      .where(eq(orders.id, o.id));
+    await tx.insert(orderEvents).values({
+      orderId: o.id,
+      fromStatus: o.status,
+      toStatus: o.status,
+      userId: actor.userId,
+      note: `Καθυστέρηση +${minutes}′`,
+    });
   });
 }

@@ -23,7 +23,16 @@ function chime(ctx: AudioContext) {
   });
 }
 
-export function OrdersBoard({ orders, today }: { orders: OrderWithItems[]; today: { completed: number; totalCents: number } }) {
+export function OrdersBoard({
+  orders,
+  today,
+  usualMinutes,
+}: {
+  orders: OrderWithItems[];
+  today: { completed: number; totalCents: number };
+  /** The business's usual preparation and delivery times, used to suggest an ETA. */
+  usualMinutes: { prep: number; delivery: number };
+}) {
   const audio = useRef<AudioContext | null>(null);
   const [soundOn, setSoundOn] = useState(false);
   const [now, setNow] = useState(() => Date.now());
@@ -99,7 +108,12 @@ export function OrdersBoard({ orders, today }: { orders: OrderWithItems[]; today
         {pending.length ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {pending.map((o) => (
-              <OrderCard key={o.id} order={o} now={now} />
+              <OrderCard
+                key={o.id}
+                order={o}
+                now={now}
+                suggestedMinutes={usualMinutes.prep + (o.fulfillment === "delivery" ? usualMinutes.delivery : 0)}
+              />
             ))}
           </div>
         ) : (
@@ -114,7 +128,12 @@ export function OrdersBoard({ orders, today }: { orders: OrderWithItems[]; today
         {inProgress.length ? (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {inProgress.map((o) => (
-              <OrderCard key={o.id} order={o} now={now} />
+              <OrderCard
+                key={o.id}
+                order={o}
+                now={now}
+                suggestedMinutes={usualMinutes.prep + (o.fulfillment === "delivery" ? usualMinutes.delivery : 0)}
+              />
             ))}
           </div>
         ) : (

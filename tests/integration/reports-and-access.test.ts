@@ -34,7 +34,7 @@ describe("monthly report", () => {
     const f = await makeBusiness({ trialEndsAt: new Date("2026-01-01") });
     const actor = { userId: "00000000-0000-4000-8000-000000000000", role: "business" as const, businessId: f.business.id };
     const done = await placeOrder(parse(orderInput(f)));
-    for (const st of ["accepted", "ready", "completed"] as const) await updateOrderStatus(done.id, st, actor);
+    for (const st of ["accepted", "ready", "completed"] as const) await updateOrderStatus(done.id, st, actor, undefined, { estimatedMinutes: 30 });
     const rejected = await placeOrder(parse(orderInput(f)));
     await updateOrderStatus(rejected.id, "rejected", actor);
     await placeOrder(parse(orderInput(f))); // still pending
@@ -48,7 +48,7 @@ describe("monthly report", () => {
     const f = await makeBusiness();
     const o = await placeOrder(parse(orderInput(f)));
     const actor = { userId: "00000000-0000-4000-8000-000000000000", role: "business" as const, businessId: f.business.id };
-    for (const st of ["accepted", "ready", "completed"] as const) await updateOrderStatus(o.id, st, actor);
+    for (const st of ["accepted", "ready", "completed"] as const) await updateOrderStatus(o.id, st, actor, undefined, { estimatedMinutes: 30 });
     const [row] = await db.select().from(s.orders).where(eq(s.orders.id, o.id));
     expect(row.commissionStatus).toBe("not_applicable");
     const r = (await businessReport(new Date(0), new Date(Date.now() + 86400_000))).find((x) => x.id === f.business.id)!;

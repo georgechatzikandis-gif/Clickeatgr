@@ -25,7 +25,7 @@ import {
   ownsProduct,
 } from "@/server/business-data";
 import { ImageError, storeImage } from "@/server/images";
-import { OrderError, updateOrderStatus } from "@/server/orders";
+import { delayOrder, OrderError, updateOrderStatus } from "@/server/orders";
 
 /** Runs a mutation and turns expected errors into a message for the form. */
 async function run(fn: () => Promise<string | void>): Promise<ActionResult> {
@@ -43,13 +43,29 @@ async function run(fn: () => Promise<string | void>): Promise<ActionResult> {
 
 // ---------------------------------------------------------------- orders
 
-export async function setOrderStatusAction(orderId: string, to: OrderStatus, note?: string): Promise<ActionResult> {
+export async function setOrderStatusAction(
+  orderId: string,
+  to: OrderStatus,
+  note?: string,
+  estimatedMinutes?: number,
+): Promise<ActionResult> {
   return run(async () => {
     const u = await requireBusinessUser();
     if (!orderStatus.enumValues.includes(to)) throw new FormError("Μη έγκυρη κατάσταση.");
-    await updateOrderStatus(orderId, to, { userId: u.id, role: "business", businessId: u.businessId }, note?.slice(0, 300));
+    await updateOrderStatus(orderId, to, { userId: u.id, role: "business", businessId: u.businessId }, note?.slice(0, 300), {
+      estimatedMinutes,
+    });
     revalidatePath("/dashboard");
     return "Ενημερώθηκε.";
+  });
+}
+
+export async function delayOrderAction(orderId: string, minutes: number): Promise<ActionResult> {
+  return run(async () => {
+    const u = await requireBusinessUser();
+    await delayOrder(orderId, minutes, { userId: u.id, role: "business", businessId: u.businessId });
+    revalidatePath("/dashboard");
+    return "Ο πελάτης βλέπει τη νέα ώρα.";
   });
 }
 

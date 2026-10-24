@@ -23,7 +23,16 @@ test("business receives an order and moves it through every status", async ({ pa
   await expect(card.getByText("Δοκιμαστικός Πελάτης")).toBeVisible();
   await shot(biz, info, "7-dashboard");
 
-  for (const label of ["✓ Αποδοχή", "Ετοιμάζεται", "Έτοιμη", "Σε διανομή"]) {
+  // Accept by choosing how long it will take; the customer sees the expected time.
+  await card.getByRole("button", { name: "Αποδοχή, έτοιμη σε 30 λεπτά" }).click();
+  await expect(card.getByText(/Παράδοση έως/)).toBeVisible();
+  await card.getByRole("button", { name: "+10′" }).click();
+  await expect(card.getByText(/\(σε (39|40)′\)/)).toBeVisible();
+  await page.goto(customerUrl);
+  await expect(page.getByTestId("order-eta")).toContainText("Εκτιμώμενη ώρα παράδοσης");
+  await shot(page, info, "10-customer-eta");
+
+  for (const label of ["Ετοιμάζεται", "Έτοιμη", "Σε διανομή"]) {
     await card.getByRole("button", { name: label }).click();
     await expect(card.getByRole("button", { name: label })).toHaveCount(0);
   }

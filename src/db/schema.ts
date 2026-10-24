@@ -315,6 +315,10 @@ export const orders = pgTable(
     commissionStatus: commissionStatus("commission_status").notNull(),
 
     rejectionReason: text("rejection_reason"),
+    // Set by the business when accepting: minutes it needs, and the resulting time the customer can expect
+    // the order (delivered, or ready for pickup). Can be pushed back with "+10′".
+    estimatedMinutes: integer("estimated_minutes"),
+    estimatedAt: timestamp("estimated_at", { withTimezone: true }),
     createdAt: createdAt(),
     updatedAt: updatedAt(),
     acceptedAt: timestamp("accepted_at", { withTimezone: true }),
@@ -333,6 +337,7 @@ export const orders = pgTable(
       "order_trial_zero_commission",
       sql`(not ${t.isTrial}) or (${t.commissionCents} = 0 and ${t.commissionRateBps} = 0)`,
     ),
+    check("order_estimated_minutes_range", sql`${t.estimatedMinutes} is null or ${t.estimatedMinutes} between 1 and 240`),
     check(
       "order_delivery_has_address",
       sql`${t.fulfillment} <> 'delivery' or (${t.address} is not null and ${t.deliveryZoneName} is not null)`,

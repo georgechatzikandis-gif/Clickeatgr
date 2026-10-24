@@ -35,3 +35,6 @@ export function allowedTransitions(from: OrderStatus, fulfillment: "delivery" | 
 export function canTransition(from: OrderStatus, to: OrderStatus, fulfillment: "delivery" | "pickup"): boolean {
   return allowedTransitions(from, fulfillment).includes(to);
 }
+
+/** Times a business can choose when accepting an order (minutes until delivered / ready for pickup). */
+export const ETA_CHOICES = [15, 20, 30, 45, 60, 90] as const;

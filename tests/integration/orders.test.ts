@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { db } from "@/db";
 import * as s from "@/db/schema";
 import { placeOrderSchema } from "@/lib/validation";
-import { OrderError, placeOrder, updateOrderStatus } from "@/server/orders";
+import { delayOrder, OrderError, placeOrder, updateOrderStatus } from "@/server/orders";
 import { makeBusiness, orderInput, resetDb } from "./fixtures";
 
 const parse = (v: unknown) => placeOrderSchema.parse(v);
@@ -121,7 +121,7 @@ describe("commission after the trial", () => {
     expect(o).toMatchObject({ isTrial: false, commissionRateBps: 500, commissionableCents: 2000, commissionCents: 100, commissionStatus: "pending" });
 
     for (const st of ["accepted", "preparing", "ready", "out_for_delivery", "completed"] as const) {
-      await updateOrderStatus(a.id, st, actor);
+      await updateOrderStatus(a.id, st, actor, undefined, { estimatedMinutes: 30 });
     }
     [o] = await db.select().from(s.orders).where(eq(s.orders.id, a.id));
     expect(o).toMatchObject({ status: "completed", commissionStatus: "due", commissionCents: 100 });
@@ -151,7 +151,7 @@ describe("updateOrderStatus authorization", () => {
     const intruder = await makeBusiness();
     const a = await placeOrder(parse(orderInput(f)));
     await expect(
-      updateOrderStatus(a.id, "accepted", { userId: "00000000-0000-4000-8000-000000000000", role: "business", businessId: intruder.business.id }),
+      updateOrderStatus(a.id, "accepted", { userId: "00000000-0000-4000-8000-000000000000", role: "business", businessId: intruder.business.id }, undefined, { estimatedMinutes: 30 }),
     ).rejects.toThrow(/δεν βρέθηκε/);
     const [o] = await db.select().from(s.orders).where(eq(s.orders.id, a.id));
     expect(o.status).toBe("pending");
@@ -162,5 +162,41 @@ describe("updateOrderStatus authorization", () => {
     const a = await placeOrder(parse(orderInput(f)));
     const actor = { userId: "00000000-0000-4000-8000-000000000000", role: "business" as const, businessId: f.business.id };
     await expect(updateOrderStatus(a.id, "completed", actor)).rejects.toThrow(OrderError);
+  });
+});
+
+describe("estimated time", () => {
+  beforeEach(resetDb);
+  const actorFor = (businessId: string) => ({ userId: "00000000-0000-4000-8000-000000000000", role: "business" as const, businessId });
+
+  it("requires a time to accept and stores the expected time", async () => {
+    const f = await makeBusiness();
+    const a = await placeOrder(parse(orderInput(f)));
+    await expect(updateOrderStatus(a.id, "accepted", actorFor(f.business.id))).rejects.toThrow(/λεπτά/);
+    await expect(updateOrderStatus(a.id, "accepted", actorFor(f.business.id), undefined, { estimatedMinutes: 0 })).rejects.toThrow(OrderError);
+
+    const before = Date.now();
+    await updateOrderStatus(a.id, "accepted", actorFor(f.business.id), undefined, { estimatedMinutes: 30 });
+    const [o] = await db.select().from(s.orders).where(eq(s.orders.id, a.id));
+    expect(o.status).toBe("accepted");
+    expect(o.estimatedMinutes).toBe(30);
+    const diff = o.estimatedAt!.getTime() - before;
+    expect(diff).toBeGreaterThanOrEqual(30 * 60_000 - 1000);
+    expect(diff).toBeLessThan(31 * 60_000);
+  });
+
+  it("lets only the order's business push the time back", async () => {
+    const f = await makeBusiness();
+    const other = await makeBusiness();
+    const a = await placeOrder(parse(orderInput(f)));
+    await expect(delayOrder(a.id, 10, actorFor(f.business.id))).rejects.toThrow(/αποδεκτές/); // still pending
+    await updateOrderStatus(a.id, "accepted", actorFor(f.business.id), undefined, { estimatedMinutes: 20 });
+    const [before] = await db.select().from(s.orders).where(eq(s.orders.id, a.id));
+
+    await expect(delayOrder(a.id, 10, actorFor(other.business.id))).rejects.toThrow(/δεν βρέθηκε/);
+    await delayOrder(a.id, 10, actorFor(f.business.id));
+    const [after] = await db.select().from(s.orders).where(eq(s.orders.id, a.id));
+    expect(after.estimatedMinutes).toBe(30);
+    expect(after.estimatedAt!.getTime() - before.estimatedAt!.getTime()).toBe(10 * 60_000);
   });
 });

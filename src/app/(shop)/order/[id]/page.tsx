@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { AutoRefresh } from "@/components/auto-refresh";
+import { formatAthens } from "@/lib/hours";
 import { formatEuro } from "@/lib/money";
 import { FINAL_STATUSES, STATUS_LABELS } from "@/lib/order-status";
 import { getOrderForCustomer } from "@/server/public-orders";
@@ -43,6 +44,14 @@ export default async function OrderPage(props: PageProps<"/order/[id]">) {
 
       <div className="card mt-6 p-4" aria-live="polite">
         <p className="font-semibold">{CUSTOMER_TEXT[o.status]}</p>
+        {o.estimatedAt && !final && (
+          <p className="mt-2 rounded-xl bg-brand-soft p-3 text-center" data-testid="order-eta">
+            <span className="block text-sm text-ink-soft">
+              {o.fulfillment === "delivery" ? "Εκτιμώμενη ώρα παράδοσης" : "Έτοιμη για παραλαβή περίπου στις"}
+            </span>
+            <span className="text-3xl font-extrabold">{formatAthens(new Date(o.estimatedAt), { timeStyle: "short" })}</span>
+          </p>
+        )}
         {o.rejectionReason && <p className="mt-1 text-sm text-ink-soft">Αιτία: {o.rejectionReason}</p>}
         {!failed && (
           <ol className="mt-4 flex gap-1">

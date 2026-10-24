@@ -1,11 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { setOrderStatusAction } from "@/app/actions/business";
+import { delayOrderAction, setOrderStatusAction } from "@/app/actions/business";
 import type { OrderStatus } from "@/db/schema";
 import { formatAthens } from "@/lib/hours";
 import { formatEuro } from "@/lib/money";
-import { STATUS_LABELS, allowedTransitions } from "@/lib/order-status";
+import { ETA_CHOICES, STATUS_LABELS, allowedTransitions } from "@/lib/order-status";
 import type { OrderWithItems } from "@/server/business-data";
 
 const STATUS_COLORS: Record<OrderStatus, string> = {
@@ -20,7 +20,6 @@ const STATUS_COLORS: Record<OrderStatus, string> = {
 };
 
 const ACTION_LABELS: Partial<Record<OrderStatus, string>> = {
-  accepted: "✓ Αποδοχή",
   preparing: "Ετοιμάζεται",
   ready: "Έτοιμη",
   out_for_delivery: "Σε διανομή",
@@ -33,13 +32,38 @@ export function StatusBadge({ status }: { status: OrderStatus }) {
   return <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${STATUS_COLORS[status]}`}>{STATUS_LABELS[status]}</span>;
 }
 
-export function OrderCard({ order: o, now, actions = true }: { order: OrderWithItems; now: number; actions?: boolean }) {
+export function OrderCard({
+  order: o,
+  now,
+  actions = true,
+  suggestedMinutes,
+}: {
+  order: OrderWithItems;
+  now: number;
+  actions?: boolean;
+  /** Usual time for this business (prep, plus delivery for delivery orders); highlighted when accepting. */
+  suggestedMinutes?: number;
+}) {
   const [pending, start] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const isNew = o.status === "pending";
   const minutesAgo = Math.max(0, Math.round((now - new Date(o.createdAt).getTime()) / 60000));
 
-  const change = (to: OrderStatus) => {
+  const suggested =
+    suggestedMinutes === undefined
+      ? undefined
+      : ETA_CHOICES.reduce((best, m) => (Math.abs(m - suggestedMinutes) < Math.abs(best - suggestedMinutes) ? m : best));
+  const etaMinutesLeft = o.estimatedAt ? Math.round((new Date(o.estimatedAt).getTime() - now) / 60000) : null;
+
+  const delay = (minutes: number) => {
+    setError(null);
+    start(async () => {
+      const res = await delayOrderAction(o.id, minutes);
+      if (res?.error) setError(res.error);
+    });
+  };
+
+  const change = (to: OrderStatus, estimatedMinutes?: number) => {
     let note: string | undefined;
     if (to === "rejected" || to === "cancelled") {
       const r = window.prompt(to === "rejected" ? "Αιτία απόρριψης (θα τη δει ο πελάτης):" : "Αιτία ακύρωσης:");
@@ -48,7 +72,7 @@ export function OrderCard({ order: o, now, actions = true }: { order: OrderWithI
     }
     setError(null);
     start(async () => {
-      const res = await setOrderStatusAction(o.id, to, note);
+      const res = await setOrderStatusAction(o.id, to, note, estimatedMinutes);
       if (res?.error) setError(res.error);
     });
   };
@@ -62,7 +86,8 @@ export function OrderCard({ order: o, now, actions = true }: { order: OrderWithI
       <header className={`flex items-center justify-between gap-2 px-4 py-2.5 ${isNew ? "bg-brand-soft" : "bg-surface"}`}>
         <div>
           <p className="font-mono text-lg font-bold">{o.reference}</p>
-          <p className="text-xs text-ink-soft">
+          {/* Relative times depend on the clock, which differs slightly between server and browser. */}
+          <p className="text-xs text-ink-soft" suppressHydrationWarning>
             {formatAthens(new Date(o.createdAt), { timeStyle: "short" })} · πριν {minutesAgo}′
           </p>
         </div>
@@ -112,25 +137,60 @@ export function OrderCard({ order: o, now, actions = true }: { order: OrderWithI
             {error}
           </p>
         )}
+        {o.estimatedAt && !["completed", "rejected", "cancelled"].includes(o.status) && (
+          <div className="flex items-center justify-between gap-2 rounded-lg bg-blue-50 p-2.5">
+            <p>
+              ⏱ {o.fulfillment === "delivery" ? "Παράδοση" : "Έτοιμη"} έως{" "}
+              <strong>{formatAthens(new Date(o.estimatedAt), { timeStyle: "short" })}</strong>
+              <span suppressHydrationWarning className={`ml-1 ${etaMinutesLeft !== null && etaMinutesLeft < 0 ? "font-semibold text-danger" : "text-ink-soft"}`}>
+                {etaMinutesLeft !== null && etaMinutesLeft >= 0 ? `(σε ${etaMinutesLeft}′)` : `(καθυστέρηση ${-(etaMinutesLeft ?? 0)}′)`}
+              </span>
+            </p>
+            {actions && (
+              <button type="button" disabled={pending} onClick={() => delay(10)} className="btn-ghost !px-2.5 !py-1 text-xs">
+                +10′
+              </button>
+            )}
+          </div>
+        )}
+        {actions && isNew && (
+          <div>
+            <p className="mb-1.5 font-semibold">Αποδοχή — έτοιμη σε:</p>
+            <div className="grid grid-cols-3 gap-2">
+              {ETA_CHOICES.map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  disabled={pending}
+                  onClick={() => change("accepted", m)}
+                  className={m === suggested ? "btn-primary !py-3 text-base" : "btn-dark !py-3 text-base"}
+                  aria-label={`Αποδοχή, έτοιμη σε ${m} λεπτά`}
+                >
+                  {m}′
+                </button>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-ink-soft">
+              {o.fulfillment === "delivery" ? "Χρόνος μέχρι να φτάσει στον πελάτη." : "Χρόνος μέχρι να είναι έτοιμη για παραλαβή."}{" "}
+              Ο πελάτης βλέπει αμέσως την ώρα.
+            </p>
+          </div>
+        )}
         {actions && (
           <div className="flex flex-wrap gap-2">
-            {allowedTransitions(o.status, o.fulfillment).map((to) => (
+            {allowedTransitions(o.status, o.fulfillment)
+              .filter((to) => to !== "accepted")
+              .map((to) => (
               <button
                 key={to}
                 type="button"
                 disabled={pending}
                 onClick={() => change(to)}
-                className={
-                  to === "rejected" || to === "cancelled"
-                    ? "btn-ghost !px-3 text-danger"
-                    : to === "accepted"
-                      ? "btn-primary flex-1 !py-3 text-base"
-                      : "btn-dark flex-1"
-                }
+                className={to === "rejected" || to === "cancelled" ? "btn-ghost !px-3 text-danger" : "btn-dark flex-1"}
               >
                 {ACTION_LABELS[to]}
               </button>
-            ))}
+              ))}
           </div>
         )}
       </div>
