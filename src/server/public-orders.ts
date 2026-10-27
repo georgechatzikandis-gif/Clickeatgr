@@ -8,7 +8,7 @@ import { businesses, orderItems, orders } from "@/db/schema";
 export async function getOrderForCustomer(id: string, token: string | undefined) {
   if (!token || !/^[0-9a-f-]{36}$/.test(id)) return null;
   const [row] = await db
-    .select({ order: orders, businessName: businesses.name, businessPhone: businesses.phone, businessAddress: businesses.address, businessSlug: businesses.slug })
+    .select({ order: orders, businessName: businesses.name, businessAddress: businesses.address, businessSlug: businesses.slug })
     .from(orders)
     .innerJoin(businesses, eq(businesses.id, orders.businessId))
     .where(eq(orders.id, id))

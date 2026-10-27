@@ -16,6 +16,13 @@ test("customer can browse, customise a product and place a cash order", async ({
   await expect(page.getByText("Μετρητά κατά την παράδοση")).toBeVisible();
   await shot(page, info, "6-confirmation");
 
+  // Business phone numbers are never shown to customers (demo shops use +302241000000).
+  expect(await page.content()).not.toContain("2241000000");
+  const orderUrl = page.url();
+  await page.goto("/r/demo-pizza");
+  expect(await page.content()).not.toContain("2241000000");
+  await page.goto(orderUrl);
+
   // The confirmation survives a reload, and the cart has been emptied.
   await page.reload();
   await expect(page.getByTestId("order-reference")).toHaveText(ref);

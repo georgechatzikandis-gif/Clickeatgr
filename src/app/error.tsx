@@ -8,8 +8,8 @@ export default function ErrorPage({ error, retry }: { error: unknown; retry: () 
       <p className="text-5xl" aria-hidden>😕</p>
       <h1 className="mt-3 text-xl font-bold">Κάτι πήγε στραβά</h1>
       <p className="mt-1 text-ink-soft">
-        Η σελίδα δεν φόρτωσε. Δοκιμάστε ξανά σε λίγο. Αν είχατε στείλει παραγγελία, ελέγξτε τη σελίδα της παραγγελίας ή
-        καλέστε το κατάστημα.
+        Η σελίδα δεν φόρτωσε. Δοκιμάστε ξανά σε λίγο. Αν είχατε στείλει παραγγελία, ελέγξτε τη σελίδα της
+        παραγγελίας.
       </p>
       <div className="mt-6 flex gap-2">
         <button type="button" className="btn-primary" onClick={() => retry()}>

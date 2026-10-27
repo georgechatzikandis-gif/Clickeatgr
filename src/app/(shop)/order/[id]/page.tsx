@@ -68,11 +68,6 @@ export default async function OrderPage(props: PageProps<"/order/[id]">) {
 
       <div className="card mt-4 p-4 text-sm">
         <h2 className="font-bold">{data.businessName}</h2>
-        {data.businessPhone && (
-          <p className="mt-0.5">
-            Τηλέφωνο καταστήματος: <a className="font-semibold underline" href={`tel:${data.businessPhone}`}>{data.businessPhone}</a>
-          </p>
-        )}
         <ul className="mt-3 divide-y divide-line">
           {items.map((i) => (
             <li key={i.id} className="flex justify-between gap-3 py-2">

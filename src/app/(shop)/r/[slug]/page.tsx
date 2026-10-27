@@ -97,7 +97,7 @@ export default async function BusinessPage(props: PageProps<"/r/[slug]">) {
             )}
             <h2 className="mt-4 font-semibold">Στοιχεία καταστήματος</h2>
             <p className="mt-1 text-sm text-ink-soft">
-              {[b.legalName, b.vatNumber && `ΑΦΜ ${b.vatNumber}`, b.address, b.phone].filter(Boolean).join(" · ")}
+              {[b.legalName, b.vatNumber && `ΑΦΜ ${b.vatNumber}`, b.address].filter(Boolean).join(" · ")}
             </p>
           </div>
         </section>

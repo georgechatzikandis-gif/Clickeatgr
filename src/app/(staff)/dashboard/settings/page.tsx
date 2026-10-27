@@ -26,7 +26,7 @@ export default async function SettingsPage() {
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="label" htmlFor="phone">Τηλέφωνο (εμφανίζεται στον πελάτη)</label>
+              <label className="label" htmlFor="phone">Τηλέφωνο (μόνο για το ClickEat, δεν εμφανίζεται στους πελάτες)</label>
               <input id="phone" name="phone" maxLength={30} defaultValue={b.phone} className="input" />
             </div>
             <div>
