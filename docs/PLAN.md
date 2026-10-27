@@ -152,3 +152,11 @@ Candidates, roughly in order of value for a small launch (all free unless noted)
 | Business "busy mode" (+15′ to prep time) | Small | One toggle on the dashboard |
 | Online card payments, tips | Large | Stage 5 — Stripe/Viva; costs and legal setup to be explained first |
 | Courier live tracking | Large | Not needed: businesses deliver with their own staff |
+
+## 9. Open items noted during live testing
+
+- **Customer contact for orders (legal):** business phone numbers are hidden from customers (owner's decision).
+  Distance-selling rules require some contact channel, so add a ClickEat support email/phone on the order page
+  and in the Terms before launch — owner postponed this; confirm with a lawyer/accountant.
+- **Product videos:** owner wants short real videos per product (stored on Cloudflare R2, needs R2 enabled).
+- **Test shops:** 10 live test shops (test-*) — remove with the "Database setup / migrate" action (`remove`) before launch.
