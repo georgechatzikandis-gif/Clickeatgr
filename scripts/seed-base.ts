@@ -17,6 +17,7 @@ export async function seedBase() {
     ["estiatoria", "Εστιατόρια", "🍽️"],
     ["glyka", "Γλυκά", "🍰"],
     ["snacks", "Σνακ", "🥪"],
+    ["sushi", "Sushi", "🍣"],
   ] as const;
   await db
     .insert(schema.categories)

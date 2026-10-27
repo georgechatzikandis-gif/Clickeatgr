@@ -14,9 +14,9 @@ on:
         type: boolean
         default: false
       test_shops:
-        description: "10 test shops (24/7, marked ΔΟΚΙΜΑΣΤΙΚΟ): add, or remove them with their test orders"
+        description: "10 test shops (24/7, marked ΔΟΚΙΜΑΣΤΙΚΟ): add, remove (with their test orders), or replace"
         type: choice
-        options: [none, add, remove]
+        options: [none, add, remove, replace]
         default: none
 
 jobs:
@@ -47,7 +47,10 @@ jobs:
           if [ -z "$ADMIN_EMAIL" ] || [ -z "$CLICKEAT_PASSWORD" ]; then echo "::error::Set ADMIN_EMAIL and ADMIN_INITIAL_PASSWORD secrets"; exit 1; fi
           pnpm user:create admin "$ADMIN_EMAIL"
       - name: Test shops
-        if: ${{ inputs.test_shops == 'add' || inputs.test_shops == 'remove' }}
+        if: ${{ inputs.test_shops != 'none' && inputs.test_shops != '' }}
         env:
           TEST_SHOP_PASSWORD: ${{ secrets.TEST_SHOP_PASSWORD }}
-        run: pnpm db:seed:test-shops ${{ inputs.test_shops == 'remove' && '--remove' || '' }}
+          MODE: ${{ inputs.test_shops }}
+        run: |
+          if [ "$MODE" = "remove" ] || [ "$MODE" = "replace" ]; then pnpm db:seed:test-shops --remove; fi
+          if [ "$MODE" = "add" ] || [ "$MODE" = "replace" ]; then pnpm db:seed:test-shops; fi
