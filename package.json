@@ -18,7 +18,8 @@
     "data:anonymize": "tsx scripts/anonymize-old-orders.ts",
     "cf:build": "opennextjs-cloudflare build",
     "cf:preview": "opennextjs-cloudflare build && opennextjs-cloudflare preview",
-    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy"
+    "cf:deploy": "opennextjs-cloudflare build && opennextjs-cloudflare deploy",
+    "db:seed:test-shops": "tsx scripts/seed-test-shops.ts"
   },
   "dependencies": {
     "@opennextjs/cloudflare": "1.20.13",
