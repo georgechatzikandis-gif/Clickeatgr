@@ -38,7 +38,7 @@ export async function placeDemoPizzaOrder(page: Page, info?: TestInfo) {
   await page.getByLabel("Μπέικον").check();
   if (info) await shot(page, info, "3-product");
   await page.getByRole("button", { name: /Προσθήκη/ }).click();
-  await page.getByRole("link", { name: /Καλάθι|Συνέχεια/ }).first().click();
+  await goToCheckout(page, "Ρόδος – Πόλη");
   await page.waitForURL("**/checkout");
   await page.getByLabel("Ονοματεπώνυμο").fill("Δοκιμαστικός Πελάτης");
   await page.getByLabel("Κινητό τηλέφωνο").fill("6900000000");
@@ -50,4 +50,15 @@ export async function placeDemoPizzaOrder(page: Page, info?: TestInfo) {
   await page.getByRole("button", { name: /Επιβεβαίωση/ }).click();
   await page.waitForURL("**/order/**");
   return (await page.getByTestId("order-reference").textContent())!.trim();
+}
+
+/** Picks the delivery area on the menu page and continues to checkout (desktop sidebar or mobile cart sheet). */
+export async function goToCheckout(page: Page, area: string | "pickup") {
+  const picker = page.getByLabel(/Πού θα το παραδώσουμε|Τρόπος παραλαβής/).filter({ visible: true }).first();
+  if (area === "pickup") await picker.selectOption("pickup");
+  else await picker.selectOption((await picker.locator("option", { hasText: area }).getAttribute("value"))!);
+  const sheetButton = page.getByRole("button", { name: /^Καλάθι \(/ });
+  if (await sheetButton.isVisible()) await sheetButton.click();
+  await page.getByRole("link", { name: /Συνέχεια στο ταμείο/ }).filter({ visible: true }).click();
+  await page.waitForURL("**/checkout");
 }

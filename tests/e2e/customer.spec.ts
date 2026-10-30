@@ -52,3 +52,30 @@ test("cart is limited to one business", async ({ page }) => {
   await page.goto("/r/demo-cafe/checkout");
   await expect(page.getByText("Πορτοκαλόπιτα")).toBeVisible();
 });
+
+test("menu page shows the chosen area, fees and the minimum order before checkout", async ({ page }) => {
+  await page.goto("/r/demo-cafe");
+  await page.getByRole("button", { name: /Πορτοκαλόπιτα/ }).first().click();
+  await page.getByRole("button", { name: /Προσθήκη/ }).click();
+  const visible = (re: RegExp) => page.getByText(re).filter({ visible: true }).first();
+  await expect(visible(/Επιλέξτε περιοχή για να δείτε/)).toBeVisible();
+
+  const picker = page.getByLabel("Πού θα το παραδώσουμε;").filter({ visible: true }).first();
+  const zoneValue = async (name: string) => (await picker.locator("option", { hasText: name }).getAttribute("value"))!;
+  await picker.selectOption(await zoneValue("Ιξιά"));
+  await expect(visible(/Λείπουν 8,00\s€ για την ελάχιστη παραγγελία \(12,00\s€\)/)).toBeVisible();
+
+  await picker.selectOption(await zoneValue("Ρόδος – Πόλη"));
+  await expect(visible(/Λείπουν 4,00\s€ για την ελάχιστη παραγγελία \(8,00\s€\)/)).toBeVisible();
+  // Mobile: the cart opens as a sheet from the bottom bar.
+  const sheetButton = page.getByRole("button", { name: /^Καλάθι \(/ });
+  if (await sheetButton.isVisible()) await sheetButton.click();
+  await expect(page.getByRole("button", { name: /^Λείπουν 4,00\s€$/ }).filter({ visible: true })).toBeDisabled();
+  await page.getByRole("button", { name: "Αύξηση ποσότητας" }).filter({ visible: true }).click();
+  await expect(visible(/Συμπληρώθηκε η ελάχιστη παραγγελία/)).toBeVisible();
+  await page.getByRole("link", { name: /Συνέχεια στο ταμείο · 9,00\s€/ }).filter({ visible: true }).click();
+
+  // Checkout starts with the same area.
+  await page.waitForURL("**/checkout");
+  await expect(page.locator("#zone option:checked")).toHaveText(/Ρόδος – Πόλη/);
+});

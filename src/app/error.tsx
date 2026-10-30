@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 // Shown instead of a page when something fails on the server (e.g. the database is unreachable).
 export default function ErrorPage({ error, retry }: { error: unknown; retry: () => void }) {
   const digest = error instanceof Error && "digest" in error ? String(error.digest) : null;
@@ -15,9 +17,9 @@ export default function ErrorPage({ error, retry }: { error: unknown; retry: () 
         <button type="button" className="btn-primary" onClick={() => retry()}>
           Δοκιμή ξανά
         </button>
-        <a href="/" className="btn-ghost">
+        <Link href="/" className="btn-ghost">
           Αρχική
-        </a>
+        </Link>
       </div>
       {digest && <p className="mt-6 font-mono text-xs text-ink-soft">Κωδικός σφάλματος: {digest}</p>}
     </div>

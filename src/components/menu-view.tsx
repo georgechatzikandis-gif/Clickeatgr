@@ -1,15 +1,25 @@
 "use client";
 
-import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { addToCart, cartCount, cartSubtotal, setQuantity, useCart } from "@/lib/cart";
+import { addToCart, cartCount, cartSubtotal, useCart } from "@/lib/cart";
 import { formatEuro } from "@/lib/money";
 import type { PublicMenuProduct } from "@/server/catalog";
+import { AreaPicker, CartPanel, MinimumOrderStatus, useOrderTerms, type DeliveryInfo } from "./cart-panel";
 
 type Business = { id: string; slug: string; name: string };
 type Section = { id: string; name: string; products: PublicMenuProduct[] };
 
-export function MenuView({ business, sections, canOrder }: { business: Business; sections: Section[]; canOrder: boolean }) {
+export function MenuView({
+  business,
+  sections,
+  canOrder,
+  delivery,
+}: {
+  business: Business;
+  sections: Section[];
+  canOrder: boolean;
+  delivery: DeliveryInfo;
+}) {
   const [selected, setSelected] = useState<PublicMenuProduct | null>(null);
   const [q, setQ] = useState("");
   const cart = useCart();
@@ -43,6 +53,9 @@ export function MenuView({ business, sections, canOrder }: { business: Business;
             Το κατάστημα δεν δέχεται παραγγελίες αυτή τη στιγμή. Μπορείτε να δείτε τον κατάλογο.
           </div>
         )}
+        <div className="mb-3 lg:hidden">
+          <AreaPicker business={business} info={delivery} />
+        </div>
         <input
           type="search"
           value={q}
@@ -101,43 +114,15 @@ export function MenuView({ business, sections, canOrder }: { business: Business;
 
       <aside className="hidden lg:block">
         <div className="card sticky top-20 mt-6 p-4">
-          <h2 className="font-bold">Το καλάθι σας</h2>
-          {ownCart ? (
-            <>
-              <ul className="mt-3 divide-y divide-line">
-                {ownCart.lines.map((l) => (
-                  <li key={l.key} className="py-2 text-sm">
-                    <div className="flex justify-between gap-2">
-                      <span className="font-medium">{l.name}</span>
-                      <span>{formatEuro(l.unitPriceCents * l.quantity)}</span>
-                    </div>
-                    {l.optionLabels.length > 0 && <p className="text-xs text-ink-soft">{l.optionLabels.join(", ")}</p>}
-                    <QtyControl value={l.quantity} onChange={(q) => setQuantity(l.key, q)} />
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-3 flex justify-between border-t border-line pt-3 font-semibold">
-                <span>Υποσύνολο</span>
-                <span>{formatEuro(cartSubtotal(ownCart))}</span>
-              </div>
-              <Link href={`/r/${business.slug}/checkout`} className="btn-primary mt-3 w-full">
-                Συνέχεια
-              </Link>
-            </>
-          ) : (
-            <p className="mt-2 text-sm text-ink-soft">Το καλάθι είναι άδειο. Επιλέξτε προϊόντα από τον κατάλογο.</p>
-          )}
+          <h2 className="mb-3 font-bold">Το καλάθι σας</h2>
+          <CartPanel business={business} info={delivery} canOrder={canOrder} />
         </div>
       </aside>
 
       {count > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-white p-3 lg:hidden">
-          <Link href={`/r/${business.slug}/checkout`} className="btn-primary w-full !py-3">
-            Καλάθι ({count}) · {formatEuro(cartSubtotal(ownCart))}
-          </Link>
-        </div>
+        <MobileCartBar business={business} info={delivery} canOrder={canOrder} count={count} subtotal={cartSubtotal(ownCart)} />
       )}
-      {count > 0 && <div className="h-20 lg:hidden" />}
+      {count > 0 && <div className="h-28 lg:hidden" />}
 
       {selected && (
         <ProductDialog
@@ -148,6 +133,53 @@ export function MenuView({ business, sections, canOrder }: { business: Business;
         />
       )}
     </div>
+  );
+}
+
+/** Mobile: a bottom bar with the minimum-order status; tapping it opens the full cart as a sheet. */
+function MobileCartBar({
+  business,
+  info,
+  canOrder,
+  count,
+  subtotal,
+}: {
+  business: Business;
+  info: DeliveryInfo;
+  canOrder: boolean;
+  count: number;
+  subtotal: number;
+}) {
+  const [open, setOpen] = useState(false);
+  const { deliveryFee } = useOrderTerms(business, info);
+  return (
+    <>
+      <div className="fixed inset-x-0 bottom-0 z-30 space-y-2 border-t border-line bg-white p-3 lg:hidden">
+        <MinimumOrderStatus business={business} info={info} />
+        <button type="button" className="btn-primary w-full !py-3" onClick={() => setOpen(true)}>
+          Καλάθι ({count}) · {formatEuro(subtotal + deliveryFee)}
+        </button>
+      </div>
+      {open && (
+        <div className="fixed inset-0 z-40 flex items-end bg-black/40 lg:hidden" onClick={() => setOpen(false)}>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Το καλάθι σας"
+            className="max-h-[85vh] w-full overflow-y-auto rounded-t-2xl bg-white p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="font-bold">Το καλάθι σας</h2>
+              <button type="button" className="btn-ghost" onClick={() => setOpen(false)} aria-label="Κλείσιμο καλαθιού">
+                ✕
+              </button>
+            </div>
+            <CartPanel business={business} info={info} canOrder={canOrder} />
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 

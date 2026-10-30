@@ -65,6 +65,12 @@ export default async function BusinessPage(props: PageProps<"/r/[slug]">) {
           business={{ id: b.id, slug: b.slug, name: b.name }}
           sections={sections}
           canOrder={isOpen}
+          delivery={{
+            zones: zones.map((z) => ({ id: z.id, name: z.name, feeCents: z.feeCents, minOrderCents: z.minOrderCents })),
+            acceptsDelivery,
+            acceptsPickup: b.acceptsPickup,
+            pickupMinOrderCents: b.pickupMinOrderCents,
+          }}
         />
 
         <section className="mb-10 grid gap-4 border-t border-line pt-6 sm:grid-cols-2">

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { placeOrderAction } from "@/app/actions/order";
 import { clearCart, setQuantity, useCart, useHydrated, type CartLine } from "@/lib/cart";
+import { getAreaChoice, setAreaChoice } from "@/lib/area";
 import { loadProfile, rememberOrder, saveProfile } from "@/lib/customer";
 import { formatEuro } from "@/lib/money";
 import { QtyControl } from "./menu-view";
@@ -71,9 +72,13 @@ function CheckoutInner({ business, zones, lines }: Props & { lines: LiveLine[] }
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [saved] = useState(loadProfile);
   const [remember, setRemember] = useState(true);
+  // Start with the area chosen on the menu page, if it is still valid.
+  const [area] = useState(() => getAreaChoice(business.id));
   const [f, setF] = useState({
-    fulfillment: (business.acceptsDelivery ? "delivery" : "pickup") as "delivery" | "pickup",
-    deliveryZoneId: zones[0]?.id ?? "",
+    fulfillment: ((area?.fulfillment === "pickup" && business.acceptsPickup) || !business.acceptsDelivery ? "pickup" : "delivery") as
+      | "delivery"
+      | "pickup",
+    deliveryZoneId: zones.find((z) => z.id === area?.zoneId)?.id ?? zones[0]?.id ?? "",
     customerName: saved?.customerName ?? "",
     customerPhone: saved?.customerPhone ?? "",
     customerEmail: saved?.customerEmail ?? "",
@@ -82,7 +87,13 @@ function CheckoutInner({ business, zones, lines }: Props & { lines: LiveLine[] }
     notes: "",
     acceptTerms: false,
   });
-  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) => setF((p) => ({ ...p, [k]: v }));
+  const set = <K extends keyof typeof f>(k: K, v: (typeof f)[K]) =>
+    setF((p) => {
+      const next = { ...p, [k]: v };
+      if (k === "fulfillment" || k === "deliveryZoneId")
+        setAreaChoice(business.id, { fulfillment: next.fulfillment, zoneId: next.deliveryZoneId || null });
+      return next;
+    });
 
   const unavailable = lines.filter((l) => l.unavailable);
   const priceChanged = lines.some((l) => l.priceChanged);
